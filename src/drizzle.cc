@@ -320,12 +320,12 @@ int Drizzle::eioQueryFinished(eio_req* eioRequest) {
 
         if (request->buffer && request->runEach) {
             uint64_t index=0;
-            for (std::vector<std::string**>::iterator iterator = request->rows->begin(); iterator != request->rows->end(); ++iterator, index++) {
+            for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator, index++) {
                 Local<Value> eachArgv[3];
 
                 eachArgv[0] = rows->Get(index);
                 eachArgv[1] = Number::New(index);
-                eachArgv[2] = *(iterator + 1 == request->rows->end() ? True() : False());
+                eachArgv[2] = *(iterator == end ? True() : False());
 
                 TryCatch tryCatch;
                 request->cbEach->Call(Context::GetCurrent()->Global(), 3, eachArgv);

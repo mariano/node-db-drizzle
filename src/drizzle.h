@@ -1,6 +1,7 @@
 #ifndef _NODE_DRIZZLE__DRIZZLE_H
 #define _NODE_DRIZZLE__DRIZZLE_H
 
+#include <string>
 #include <vector>
 #include <node.h>
 #include <node_events.h>
