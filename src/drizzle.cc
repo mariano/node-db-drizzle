@@ -303,7 +303,7 @@ int Drizzle::eioQueryFinished(eio_req* eioRequest) {
             assert(request->rows);
 
             uint64_t index=0;
-            for (std::vector<std::string**>::iterator iterator = request->rows->begin(); iterator != request->rows->end(); ++iterator, index++) {
+            for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator, index++) {
                 std::string** row = *iterator;
                 rows->Set(index, request->drizzle->row(request->result, row));
             }
@@ -419,7 +419,7 @@ void Drizzle::eioQueryCleanup(query_request_t* request) {
 
     if (request->rows != NULL) {
         uint16_t columnCount = request->result->columnCount();
-        for (std::vector<std::string**>::iterator iterator = request->rows->begin(); iterator != request->rows->end(); ++iterator) {
+        for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator) {
             std::string** row = *iterator;
             for (uint16_t i=0; i < columnCount; i++) {
                 if (row[i] != NULL) {
