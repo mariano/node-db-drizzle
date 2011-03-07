@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <exception>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <node.h>
 #include <node_buffer.h>
@@ -20,6 +21,17 @@ class Drizzle : public node::EventEmitter {
         static void Init(Handle<Object> target);
 
     protected:
+        typedef enum {
+            COLUMN_TYPE_STRING,
+            COLUMN_TYPE_BOOL,
+            COLUMN_TYPE_INT,
+            COLUMN_TYPE_NUMBER,
+            COLUMN_TYPE_DATE,
+            COLUMN_TYPE_TIME,
+            COLUMN_TYPE_DATETIME,
+            COLUMN_TYPE_TEXT,
+            COLUMN_TYPE_SET
+        } column_type_t;
         struct connect_request_t {
             Drizzle* drizzle;
             const char* error;

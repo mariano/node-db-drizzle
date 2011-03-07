@@ -2,18 +2,9 @@
 
 using namespace drizzle;
 
-/*
-  DRIZZLE_COLUMN_TYPE_NULL,
-  DRIZZLE_COLUMN_TYPE_VARCHAR,
-  DRIZZLE_COLUMN_TYPE_ENUM=        247,
-  DRIZZLE_COLUMN_TYPE_SET=         248,
-  DRIZZLE_COLUMN_TYPE_VAR_STRING=  253,
-  DRIZZLE_COLUMN_TYPE_STRING=      254,
-  DRIZZLE_COLUMN_TYPE_GEOMETRY=    255
-*/
-
 Result::Column::Column(drizzle_column_st *column) {
     this->name = drizzle_column_name(column);
+
     switch(drizzle_column_type(column)) {
         case DRIZZLE_COLUMN_TYPE_TINY:
             this->type = (drizzle_column_size(column) == 1 ? BOOL : INT);
@@ -48,6 +39,9 @@ Result::Column::Column(drizzle_column_st *column) {
         case DRIZZLE_COLUMN_TYPE_LONG_BLOB:
         case DRIZZLE_COLUMN_TYPE_BLOB:
             this->type = TEXT;
+            break;
+        case DRIZZLE_COLUMN_TYPE_SET:
+            this->type = SET;
             break;
         default:
             this->type = STRING;

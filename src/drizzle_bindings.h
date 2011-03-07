@@ -5,6 +5,8 @@
 
 using namespace v8;
 
+#define NODE_CONSTANT(constant) Integer::New(constant)
+
 #define ARG_CHECK_OPTIONAL_STRING(I, VAR) \
     if (args.Length() > I && !args[I]->IsString()) { \
         return ThrowException(Exception::Error(String::New("Argument \"" #VAR "\" must be a valid string"))); \

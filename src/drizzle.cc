@@ -5,15 +5,27 @@ using namespace node_drizzle;
 void Drizzle::Init(Handle<Object> target) {
     HandleScope scope;
 
-    Local<FunctionTemplate> t = FunctionTemplate::New(New);
-    t->Inherit(EventEmitter::constructor_template);
-    t->InstanceTemplate()->SetInternalFieldCount(1);
+    Local<FunctionTemplate> functionTemplate = FunctionTemplate::New(New);
+    functionTemplate->Inherit(EventEmitter::constructor_template);
 
-    NODE_SET_PROTOTYPE_METHOD(t, "connect", Connect);
-    NODE_SET_PROTOTYPE_METHOD(t, "disconnect", Disconnect);
-    NODE_SET_PROTOTYPE_METHOD(t, "query", Query);
+    Local<ObjectTemplate> instanceTemplate = functionTemplate->InstanceTemplate();
+    instanceTemplate->SetInternalFieldCount(1);
 
-    target->Set(String::NewSymbol("Drizzle"), t->GetFunction());
+    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_STRING);
+    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_BOOL);
+    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_INT);
+    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_NUMBER);
+    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_DATE);
+    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_TIME);
+    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_DATETIME);
+    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_TEXT);
+    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_SET);
+
+    NODE_SET_PROTOTYPE_METHOD(functionTemplate, "connect", Connect);
+    NODE_SET_PROTOTYPE_METHOD(functionTemplate, "disconnect", Disconnect);
+    NODE_SET_PROTOTYPE_METHOD(functionTemplate, "query", Query);
+
+    target->Set(String::NewSymbol("Drizzle"), functionTemplate->GetFunction());
 }
 
 Drizzle::Drizzle(): EventEmitter(),
@@ -296,32 +308,35 @@ int Drizzle::eioQueryFinished(eio_req* eioRequest) {
         Local<Array> columns = Array::New(columnCount);
         for (uint16_t j=0; j < columnCount; j++) {
             drizzle::Result::Column *currentColumn = request->result->column(j);
-            Local<String> columnType;
+            Local<Value> columnType;
 
             switch(currentColumn->getType()) {
                 case drizzle::Result::Column::BOOL:
-                    columnType = String::New("bool");
+                    columnType = NODE_CONSTANT(COLUMN_TYPE_BOOL);
                     break;
                 case drizzle::Result::Column::INT:
-                    columnType = String::New("int");
+                    columnType = NODE_CONSTANT(COLUMN_TYPE_INT);
                     break;
                 case drizzle::Result::Column::NUMBER:
-                    columnType = String::New("number");
+                    columnType = NODE_CONSTANT(COLUMN_TYPE_NUMBER);
                     break;
                 case drizzle::Result::Column::DATE:
-                    columnType = String::New("date");
+                    columnType = NODE_CONSTANT(COLUMN_TYPE_DATE);
                     break;
                 case drizzle::Result::Column::TIME:
-                    columnType = String::New("time");
+                    columnType = NODE_CONSTANT(COLUMN_TYPE_TIME);
                     break;
                 case drizzle::Result::Column::DATETIME:
-                    columnType = String::New("datetime");
+                    columnType = NODE_CONSTANT(COLUMN_TYPE_DATETIME);
                     break;
                 case drizzle::Result::Column::TEXT:
-                    columnType = String::New("text");
+                    columnType = NODE_CONSTANT(COLUMN_TYPE_TEXT);
+                    break;
+                case drizzle::Result::Column::SET:
+                    columnType = NODE_CONSTANT(COLUMN_TYPE_SET);
                     break;
                 default:
-                    columnType = String::New("string");
+                    columnType = NODE_CONSTANT(COLUMN_TYPE_STRING);
                     break;
             }
 
@@ -525,6 +540,20 @@ Local<Object> Drizzle::row(drizzle::Result* result, std::string** currentRow, bo
                         break;
                     case drizzle::Result::Column::TEXT:
                         value = Local<Value>::New(node::Buffer::New(String::New(currentValue, currentRow[j]->length())));
+                        break;
+                    case drizzle::Result::Column::SET:
+                        {
+                            Local<Array> values = Array::New();
+                            std::istringstream stream(*currentRow[j]);
+                            std::string item;
+                            uint64_t index = 0;
+                            while(std::getline(stream, item, ',')) {
+                                if (!item.empty()) {
+                                    values->Set(Integer::New(index++), String::New(item.c_str()));
+                                }
+                            }
+                            value = values;
+                        }
                         break;
                     default:
                         value = String::New(currentValue);

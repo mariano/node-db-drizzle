@@ -20,7 +20,8 @@ class Result {
                     DATE,
                     TIME,
                     DATETIME,
-                    BOOL
+                    BOOL,
+                    SET
                 } type_t;
 
                 Column(drizzle_column_st *column);
