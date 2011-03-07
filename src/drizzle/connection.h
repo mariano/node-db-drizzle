@@ -1,7 +1,6 @@
 #ifndef _NODE_DRIZZLE__CONNECTION_H
 #define _NODE_DRIZZLE__CONNECTION_H
 
-#include <exception>
 #include <string>
 #include <libdrizzle/drizzle.h>
 #include <libdrizzle/drizzle_client.h>

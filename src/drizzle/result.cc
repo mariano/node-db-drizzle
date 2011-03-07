@@ -2,8 +2,57 @@
 
 using namespace drizzle;
 
+/*
+  DRIZZLE_COLUMN_TYPE_NULL,
+  DRIZZLE_COLUMN_TYPE_VARCHAR,
+  DRIZZLE_COLUMN_TYPE_ENUM=        247,
+  DRIZZLE_COLUMN_TYPE_SET=         248,
+  DRIZZLE_COLUMN_TYPE_VAR_STRING=  253,
+  DRIZZLE_COLUMN_TYPE_STRING=      254,
+  DRIZZLE_COLUMN_TYPE_GEOMETRY=    255
+*/
+
 Result::Column::Column(drizzle_column_st *column) {
     this->name = drizzle_column_name(column);
+    switch(drizzle_column_type(column)) {
+        case DRIZZLE_COLUMN_TYPE_TINY:
+            this->type = (drizzle_column_size(column) == 1 ? BOOL : INT);
+            break;
+        case DRIZZLE_COLUMN_TYPE_BIT:
+        case DRIZZLE_COLUMN_TYPE_SHORT:
+        case DRIZZLE_COLUMN_TYPE_YEAR:
+        case DRIZZLE_COLUMN_TYPE_INT24:
+        case DRIZZLE_COLUMN_TYPE_LONG:
+        case DRIZZLE_COLUMN_TYPE_LONGLONG:
+            this->type = INT;
+            break;
+        case DRIZZLE_COLUMN_TYPE_FLOAT:
+        case DRIZZLE_COLUMN_TYPE_DOUBLE:
+        case DRIZZLE_COLUMN_TYPE_DECIMAL:
+        case DRIZZLE_COLUMN_TYPE_NEWDECIMAL:
+            this->type = NUMBER;
+            break;
+        case DRIZZLE_COLUMN_TYPE_DATE:
+        case DRIZZLE_COLUMN_TYPE_NEWDATE:
+            this->type = DATE;
+            break;
+        case DRIZZLE_COLUMN_TYPE_TIME:
+            this->type = TIME;
+            break;
+        case DRIZZLE_COLUMN_TYPE_TIMESTAMP:
+        case DRIZZLE_COLUMN_TYPE_DATETIME:
+            this->type = DATETIME;
+            break;
+        case DRIZZLE_COLUMN_TYPE_TINY_BLOB:
+        case DRIZZLE_COLUMN_TYPE_MEDIUM_BLOB:
+        case DRIZZLE_COLUMN_TYPE_LONG_BLOB:
+        case DRIZZLE_COLUMN_TYPE_BLOB:
+            this->type = TEXT;
+            break;
+        default:
+            this->type = STRING;
+            break;
+    }
 }
 
 Result::Column::~Column() {
@@ -11,6 +60,10 @@ Result::Column::~Column() {
 
 std::string Result::Column::getName() const {
     return this->name;
+}
+
+Result::Column::type_t Result::Column::getType() const {
+    return this->type;
 }
 
 Result::Result(drizzle_st* drizzle, drizzle_result_st* result) throw(Exception&):

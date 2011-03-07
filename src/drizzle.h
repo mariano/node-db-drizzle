@@ -1,9 +1,12 @@
 #ifndef _NODE_DRIZZLE__DRIZZLE_H
 #define _NODE_DRIZZLE__DRIZZLE_H
 
+#include <stdlib.h>
+#include <exception>
 #include <string>
 #include <vector>
 #include <node.h>
+#include <node_buffer.h>
 #include <node_events.h>
 #include "drizzle/connection.h"
 #include "drizzle/result.h"
@@ -24,6 +27,7 @@ class Drizzle : public node::EventEmitter {
             Persistent<Function> cbError;
         };
         struct query_request_t {
+            bool cast;
             bool buffer;
             bool runEach;
             Drizzle* drizzle;
@@ -52,7 +56,12 @@ class Drizzle : public node::EventEmitter {
         static int eioQueryEach(eio_req* eioRequest);
         static int eioQueryEachFinished(eio_req* eioRequest);
         static void eioQueryCleanup(query_request_t* request);
-        Local<Object> row(drizzle::Result* result, std::string** currentRow);
+        Local<Object> row(drizzle::Result* result, std::string** currentRow, bool cast) const;
+
+    private:
+        // Parsing code borrowed from https://github.com/Sannis/node-mysql-libmysqlclient
+        uint64_t parseDate(const std::string& value, bool hasTime) const throw(std::exception&);
+        uint16_t parseTime(const std::string& value) const;
 };
 }
 

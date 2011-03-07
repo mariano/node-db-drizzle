@@ -12,12 +12,25 @@ class Result {
     public:
         class Column {
             public:
+                typedef enum {
+                    STRING,
+                    TEXT,
+                    INT,
+                    NUMBER,
+                    DATE,
+                    TIME,
+                    DATETIME,
+                    BOOL
+                } type_t;
+
                 Column(drizzle_column_st *column);
                 ~Column();
                 std::string getName() const;
+                type_t getType() const;
 
             protected:
                 std::string name;
+                type_t type;
         };
 
         Result(drizzle_st* drizzle, drizzle_result_st* result) throw(Exception&);

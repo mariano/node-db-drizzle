@@ -190,6 +190,7 @@ Handle<Value> Drizzle::Query(const Arguments& args) {
     Local<Object> options = args[1]->ToObject();
 
     ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, buffer);
+    ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, cast);
     ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, success);
     ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, error);
     ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, each);
@@ -201,6 +202,7 @@ Handle<Value> Drizzle::Query(const Arguments& args) {
 
     query_request_t *request = new query_request_t();
     request->drizzle = drizzle;
+    request->cast = true;
     request->buffer = true;
     request->runEach = false;
     request->query = *query;
@@ -210,6 +212,10 @@ Handle<Value> Drizzle::Query(const Arguments& args) {
 
     if (options->Has(buffer_key)) {
         request->buffer = options->Get(buffer_key)->IsTrue();
+    }
+
+    if (options->Has(cast_key)) {
+        request->cast = options->Get(cast_key)->IsTrue();
     }
 
     if (options->Has(success_key)) {
@@ -290,8 +296,39 @@ int Drizzle::eioQueryFinished(eio_req* eioRequest) {
         Local<Array> columns = Array::New(columnCount);
         for (uint16_t j=0; j < columnCount; j++) {
             drizzle::Result::Column *currentColumn = request->result->column(j);
+            Local<String> columnType;
+
+            switch(currentColumn->getType()) {
+                case drizzle::Result::Column::BOOL:
+                    columnType = String::New("bool");
+                    break;
+                case drizzle::Result::Column::INT:
+                    columnType = String::New("int");
+                    break;
+                case drizzle::Result::Column::NUMBER:
+                    columnType = String::New("number");
+                    break;
+                case drizzle::Result::Column::DATE:
+                    columnType = String::New("date");
+                    break;
+                case drizzle::Result::Column::TIME:
+                    columnType = String::New("time");
+                    break;
+                case drizzle::Result::Column::DATETIME:
+                    columnType = String::New("datetime");
+                    break;
+                case drizzle::Result::Column::TEXT:
+                    columnType = String::New("text");
+                    break;
+                default:
+                    columnType = String::New("string");
+                    break;
+            }
+
             Local<Object> column = Object::New();
             column->Set(String::New("name"), String::New(currentColumn->getName().c_str()));
+            column->Set(String::New("type"), columnType);
+
             columns->Set(j, column);
         }
 
@@ -305,7 +342,7 @@ int Drizzle::eioQueryFinished(eio_req* eioRequest) {
             uint64_t index=0;
             for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator, index++) {
                 std::string** row = *iterator;
-                rows->Set(index, request->drizzle->row(request->result, row));
+                rows->Set(index, request->drizzle->row(request->result, row, request->cast));
             }
 
             argc = 2;
@@ -325,7 +362,7 @@ int Drizzle::eioQueryFinished(eio_req* eioRequest) {
 
                 eachArgv[0] = rows->Get(index);
                 eachArgv[1] = Number::New(index);
-                eachArgv[2] = *(iterator == end ? True() : False());
+                eachArgv[2] = Local<Value>::New(iterator == end ? True() : False());
 
                 TryCatch tryCatch;
                 request->cbEach->Call(Context::GetCurrent()->Global(), 3, eachArgv);
@@ -397,9 +434,9 @@ int Drizzle::eioQueryEachFinished(eio_req* eioRequest) {
     if (request->rows != NULL) {
         Local<Value> eachArgv[3];
 
-        eachArgv[0] = request->drizzle->row(request->result, request->rows->front());
+        eachArgv[0] = request->drizzle->row(request->result, request->rows->front(), request->cast);
         eachArgv[1] = Number::New(request->result->index());
-        eachArgv[2] = *(request->result->hasNext() ? False() : True());
+        eachArgv[2] = Local<Value>::New(request->result->hasNext() ? False() : True());
 
         TryCatch tryCatch;
         request->cbEach->Call(Context::GetCurrent()->Global(), 3, eachArgv);
@@ -449,18 +486,109 @@ void Drizzle::eioQueryCleanup(query_request_t* request) {
     }
 }
 
-Local<Object> Drizzle::row(drizzle::Result* result, std::string** currentRow) {
+Local<Object> Drizzle::row(drizzle::Result* result, std::string** currentRow, bool cast) const {
     Local<Object> row = Object::New();
 
     for (uint16_t j=0, limitj = result->columnCount(); j < limitj; j++) {
-        Local<String> columnName = String::New(result->column(j)->getName().c_str());
+        drizzle::Result::Column* currentColumn = result->column(j);
+        Local<Value> value;
+
         if (currentRow[j] != NULL) {
-            row->Set(columnName, String::New(currentRow[j]->c_str()));
+            const char* currentValue = currentRow[j]->c_str();
+            if (cast) {
+                switch(currentColumn->getType()) {
+                    case drizzle::Result::Column::BOOL:
+                        value = Local<Value>::New(currentRow[j]->empty() || currentRow[j]->compare("0") != 0 ? True() : False());
+                        break;
+                    case drizzle::Result::Column::INT:
+                        value = String::New(currentValue)->ToInteger();
+                        break;
+                    case drizzle::Result::Column::NUMBER:
+                        value = Number::New(::atof(currentValue));
+                        break;
+                    case drizzle::Result::Column::DATE:
+                        try {
+                            value = Date::New(this->parseDate(*currentRow[j], false));
+                        } catch(std::exception&) {
+                            value = String::New(currentValue);
+                        }
+                        break;
+                    case drizzle::Result::Column::TIME:
+                        value = Date::New(this->parseTime(*currentRow[j]));
+                        break;
+                    case drizzle::Result::Column::DATETIME:
+                        try {
+                            value = Date::New(this->parseDate(*currentRow[j], true));
+                        } catch(std::exception&) {
+                            value = String::New(currentValue);
+                        }
+                        break;
+                    case drizzle::Result::Column::TEXT:
+                        value = Local<Value>::New(node::Buffer::New(String::New(currentValue, currentRow[j]->length())));
+                        break;
+                    default:
+                        value = String::New(currentValue);
+                        break;
+                }
+            } else {
+                value = String::New(currentValue);
+            }
         } else {
-            row->Set(columnName, Null());
+            value = Local<Value>::New(Null());
         }
+        row->Set(String::New(currentColumn->getName().c_str()), value);
     }
 
     return row;
 }
 
+uint64_t Drizzle::parseDate(const std::string& value, bool hasTime) const throw(std::exception&) {
+    int day, month, year, hour, min, sec;
+    int localHour, gmtHour, localMin, gmtMin;
+    time_t rawtime;
+    struct tm timeinfo;
+
+    time(&rawtime);
+    if (!localtime_r(&rawtime, &timeinfo)) {
+        throw std::exception();
+    }
+    localHour = timeinfo.tm_hour - (timeinfo.tm_isdst > 0 ? 1 : 0);
+    localMin = timeinfo.tm_min;
+
+    if (!gmtime_r(&rawtime, &timeinfo)) {
+        throw std::exception();
+    }
+    gmtHour = timeinfo.tm_hour;
+    gmtMin = timeinfo.tm_min;
+
+    int gmtDelta = ((localHour - gmtHour) * 60 + (localMin - gmtMin)) * 60;
+    if (gmtDelta <= -(12 * 60 * 60)) {
+        gmtDelta += 24 * 60 * 60;
+    }
+    if (gmtDelta > (12 * 60 * 60)) {
+        gmtDelta -= 24 * 60 * 60;
+    }
+
+    if (hasTime) {
+        sscanf(value.c_str(), "%d-%d-%d %d:%d:%d", &year, &month, &day, &hour, &min, &sec);
+    } else {
+        sscanf(value.c_str(), "%d-%d-%d", &year, &month, &day);
+        hour = min = sec = 0;
+    }
+
+    timeinfo.tm_year = year - 1900;
+    timeinfo.tm_mon = month - 1;
+    timeinfo.tm_mday = day;
+    timeinfo.tm_hour = hour;
+    timeinfo.tm_min = min;
+    timeinfo.tm_sec = sec;
+    rawtime = mktime(&timeinfo);
+
+    return static_cast<uint64_t>((rawtime + gmtDelta) * 1000);
+}
+
+uint16_t Drizzle::parseTime(const std::string& value) const {
+    int hour, min, sec;
+    sscanf(value.c_str(), "%d:%d:%d", &hour, &min, &sec);
+    return (hour * 60 * 60 + min * 60 + sec);
+}
