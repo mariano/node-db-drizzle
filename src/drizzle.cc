@@ -201,7 +201,7 @@ Handle<Value> Drizzle::Query(const Arguments& args) {
 
     query_request_t *request = new query_request_t();
     request->drizzle = drizzle;
-    request->buffer = false;
+    request->buffer = true;
     request->runEach = false;
     request->query = *query;
     request->result = NULL;
@@ -321,13 +321,14 @@ int Drizzle::eioQueryFinished(eio_req* eioRequest) {
         if (request->buffer && request->runEach) {
             uint64_t index=0;
             for (std::vector<std::string**>::iterator iterator = request->rows->begin(); iterator != request->rows->end(); ++iterator, index++) {
-                Local<Value> eachArgv[2];
+                Local<Value> eachArgv[3];
 
                 eachArgv[0] = rows->Get(index);
                 eachArgv[1] = Number::New(index);
+                eachArgv[2] = *(iterator + 1 == request->rows->end() ? True() : False());
 
                 TryCatch tryCatch;
-                request->cbEach->Call(Context::GetCurrent()->Global(), 2, eachArgv);
+                request->cbEach->Call(Context::GetCurrent()->Global(), 3, eachArgv);
                 if (tryCatch.HasCaught()) {
                     node::FatalException(tryCatch);
                 }
@@ -394,13 +395,14 @@ int Drizzle::eioQueryEachFinished(eio_req* eioRequest) {
     assert(request);
 
     if (request->rows != NULL) {
-        Local<Value> eachArgv[2];
+        Local<Value> eachArgv[3];
 
         eachArgv[0] = request->drizzle->row(request->result, request->rows->front());
         eachArgv[1] = Number::New(request->result->index());
+        eachArgv[2] = *(request->result->hasNext() ? False() : True());
 
         TryCatch tryCatch;
-        request->cbEach->Call(Context::GetCurrent()->Global(), 2, eachArgv);
+        request->cbEach->Call(Context::GetCurrent()->Global(), 3, eachArgv);
         if (tryCatch.HasCaught()) {
             node::FatalException(tryCatch);
         }
