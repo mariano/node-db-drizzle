@@ -1,0 +1,6 @@
+/build/*
+/drizzle.js
+*.node
+*.sh
+*.swp
+.lock*
