@@ -203,6 +203,8 @@ Handle<Value> Drizzle::Query(const Arguments& args) {
 
     ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, buffer);
     ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, cast);
+    ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, start);
+    ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, finish);
     ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, success);
     ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, error);
     ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, each);
@@ -230,6 +232,14 @@ Handle<Value> Drizzle::Query(const Arguments& args) {
         request->cast = options->Get(cast_key)->IsTrue();
     }
 
+    if (options->Has(start_key)) {
+        request->cbStart = Persistent<Function>::New(Local<Function>::Cast(options->Get(start_key)));
+    }
+
+    if (options->Has(finish_key)) {
+        request->cbFinish = Persistent<Function>::New(Local<Function>::Cast(options->Get(finish_key)));
+    }
+
     if (options->Has(success_key)) {
         request->cbSuccess = Persistent<Function>::New(Local<Function>::Cast(options->Get(success_key)));
     }
@@ -241,6 +251,24 @@ Handle<Value> Drizzle::Query(const Arguments& args) {
     if (options->Has(each_key)) {
         request->runEach = true;
         request->cbEach = Persistent<Function>::New(Local<Function>::Cast(options->Get(each_key)));
+    }
+
+    Local<Value> argv[1];
+    argv[0] = String::New(request->query.c_str());
+
+    TryCatch tryCatch;
+    Handle<Value> result = request->cbStart->Call(Context::GetCurrent()->Global(), 1, argv);
+    if (tryCatch.HasCaught()) {
+        node::FatalException(tryCatch);
+    }
+
+    if (!result->IsUndefined()) {
+        if (result->IsFalse()) {
+            return Undefined();
+        } else if (result->IsString()) {
+            String::Utf8Value modifiedQuery(result->ToString());
+            request->query = *modifiedQuery;
+        }
     }
 
     request->drizzle->Ref();
@@ -485,10 +513,18 @@ void Drizzle::eioQueryCleanup(query_request_t* request) {
     }
 
     if (request->result == NULL || !request->result->hasNext()) {
+        TryCatch tryCatch;
+        request->cbFinish->Call(Context::GetCurrent()->Global(), 0, NULL);
+        if (tryCatch.HasCaught()) {
+            node::FatalException(tryCatch);
+        }
+
         if (request->result != NULL) {
             delete request->result;
         }
 
+        request->cbStart.Dispose();
+        request->cbFinish.Dispose();
         request->cbSuccess.Dispose();
         request->cbError.Dispose();
         request->cbEach.Dispose();

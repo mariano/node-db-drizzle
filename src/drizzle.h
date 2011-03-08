@@ -47,6 +47,8 @@ class Drizzle : public node::EventEmitter {
             drizzle::Result *result;
             const char* error;
             std::vector<std::string**>* rows;
+            Persistent<Function> cbStart;
+            Persistent<Function> cbFinish;
             Persistent<Function> cbSuccess;
             Persistent<Function> cbError;
             Persistent<Function> cbEach;
