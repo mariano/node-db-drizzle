@@ -43,6 +43,18 @@ using namespace v8;
         return ThrowException(Exception::Error(String::New("Argument \"" #VAR "\" must be a valid function"))); \
     }
 
+#define ARG_CHECK_OPTIONAL_ARRAY(I, VAR) \
+    if (args.Length() > I && args[I]->IsArray()) { \
+        return ThrowException(Exception::Error(String::New("Argument \"" #VAR "\" must be a valid array"))); \
+    }
+
+#define ARG_CHECK_ARRAY(I, VAR) \
+    if (args.Length() <= I) { \
+        return ThrowException(Exception::Error(String::New("Argument \"" #VAR "\" is mandatory"))); \
+    } else if (!args[I]->IsArray()) { \
+        return ThrowException(Exception::Error(String::New("Argument \"" #VAR "\" must be a valid array"))); \
+    }
+
 #define ARG_CHECK_OBJECT_ATTR_STRING(VAR, KEY) \
     Local<String> KEY##_##key = String::New("" #KEY ""); \
     if (!VAR->Has(KEY##_##key)) { \

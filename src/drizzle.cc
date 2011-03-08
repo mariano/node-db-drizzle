@@ -129,7 +129,7 @@ void Drizzle::connectFinished(connect_request_t* request) {
 
     TryCatch tryCatch;
 
-    if (connected) {
+    if (connected && !request->cbSuccess.IsEmpty()) {
         Local<Object> server = Object::New();
         server->Set(String::New("version"), String::New(request->drizzle->connection->version().c_str()));
         server->Set(String::New("hostname"), String::New(request->drizzle->connection->getHostname().c_str()));
@@ -140,7 +140,7 @@ void Drizzle::connectFinished(connect_request_t* request) {
         argv[0] = server;
 
         request->cbSuccess->Call(Context::GetCurrent()->Global(), 1, argv);
-    } else {
+    } else if (!connected && !request->cbError.IsEmpty()) {
         Local<Value> argv[1];
         argv[0] = String::New(request->error != NULL ? request->error : "(unknown error)");
         request->cbError->Call(Context::GetCurrent()->Global(), 1, argv);
@@ -197,9 +197,15 @@ Handle<Value> Drizzle::Query(const Arguments& args) {
     HandleScope scope;
 
     ARG_CHECK_STRING(0, query);
-    ARG_CHECK_OBJECT(1, options);
 
-    Local<Object> options = args[1]->ToObject();
+    if (args.Length() > 2) {
+        ARG_CHECK_ARRAY(1, values);
+        ARG_CHECK_OBJECT(2, options);
+    } else {
+        ARG_CHECK_OBJECT(1, options);
+    }
+
+    Local<Object> options = args[args.Length() > 2 ? 2 : 1]->ToObject();
 
     ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, buffer);
     ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, cast);
@@ -218,7 +224,6 @@ Handle<Value> Drizzle::Query(const Arguments& args) {
     request->drizzle = drizzle;
     request->cast = true;
     request->buffer = true;
-    request->runEach = false;
     request->query = *query;
     request->result = NULL;
     request->rows = NULL;
@@ -249,25 +254,41 @@ Handle<Value> Drizzle::Query(const Arguments& args) {
     }
 
     if (options->Has(each_key)) {
-        request->runEach = true;
         request->cbEach = Persistent<Function>::New(Local<Function>::Cast(options->Get(each_key)));
+    }
+
+    Local<Array> values;
+
+    if (args.Length() > 2) {
+        values = Array::Cast(*args[1]);
+    } else {
+        values = Array::New();
+    }
+
+    try {
+        request->query = drizzle->parseQuery(request->query, values);
+    } catch(std::exception& exception) {
+        return ThrowException(Exception::Error(String::New("Wrong number of values to escape")));
     }
 
     Local<Value> argv[1];
     argv[0] = String::New(request->query.c_str());
 
-    TryCatch tryCatch;
-    Handle<Value> result = request->cbStart->Call(Context::GetCurrent()->Global(), 1, argv);
-    if (tryCatch.HasCaught()) {
-        node::FatalException(tryCatch);
-    }
+    if (!request->cbStart.IsEmpty()) {
+        TryCatch tryCatch;
+        Handle<Value> result = request->cbStart->Call(Context::GetCurrent()->Global(), 1, argv);
+        if (tryCatch.HasCaught()) {
+            node::FatalException(tryCatch);
+        }
 
-    if (!result->IsUndefined()) {
-        if (result->IsFalse()) {
-            return Undefined();
-        } else if (result->IsString()) {
-            String::Utf8Value modifiedQuery(result->ToString());
-            request->query = *modifiedQuery;
+        if (!result->IsUndefined()) {
+            if (result->IsFalse()) {
+                eioQueryRequestFree(request);
+                return Undefined();
+            } else if (result->IsString()) {
+                String::Utf8Value modifiedQuery(result->ToString());
+                request->query = *modifiedQuery;
+            }
         }
     }
 
@@ -392,13 +413,15 @@ int Drizzle::eioQueryFinished(eio_req* eioRequest) {
             argv[1] = rows;
         }
 
-        TryCatch tryCatch;
-        request->cbSuccess->Call(Context::GetCurrent()->Global(), argc, argv);
-        if (tryCatch.HasCaught()) {
-            node::FatalException(tryCatch);
+        if (!request->cbSuccess.IsEmpty()) {
+            TryCatch tryCatch;
+            request->cbSuccess->Call(Context::GetCurrent()->Global(), argc, argv);
+            if (tryCatch.HasCaught()) {
+                node::FatalException(tryCatch);
+            }
         }
 
-        if (request->buffer && request->runEach) {
+        if (!request->cbEach.IsEmpty() && request->buffer) {
             uint64_t index=0;
             for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator, index++) {
                 Local<Value> eachArgv[3];
@@ -414,7 +437,7 @@ int Drizzle::eioQueryFinished(eio_req* eioRequest) {
                 }
             }
         }
-    } else {
+    } else if (!request->cbError.IsEmpty()) {
         Local<Value> argv[1];
         argv[0] = String::New(request->error != NULL ? request->error : "(unknown error)");
 
@@ -474,7 +497,7 @@ int Drizzle::eioQueryEachFinished(eio_req* eioRequest) {
     query_request_t *request = static_cast<query_request_t *>(eioRequest->data);
     assert(request);
 
-    if (request->rows != NULL) {
+    if (!request->cbEach.IsEmpty() && request->rows != NULL) {
         Local<Value> eachArgv[3];
 
         eachArgv[0] = request->drizzle->row(request->result, request->rows->front(), request->cast);
@@ -497,44 +520,50 @@ void Drizzle::eioQueryCleanup(query_request_t* request) {
     ev_unref(EV_DEFAULT_UC);
     request->drizzle->Unref();
 
-    if (request->rows != NULL) {
-        uint16_t columnCount = request->result->columnCount();
-        for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator) {
-            std::string** row = *iterator;
-            for (uint16_t i=0; i < columnCount; i++) {
-                if (row[i] != NULL) {
-                    delete row[i];
-                }
-            }
-            delete [] row;
-        }
-
-        delete request->rows;
-    }
-
     if (request->result == NULL || !request->result->hasNext()) {
-        TryCatch tryCatch;
-        request->cbFinish->Call(Context::GetCurrent()->Global(), 0, NULL);
-        if (tryCatch.HasCaught()) {
-            node::FatalException(tryCatch);
+        if (!request->cbFinish.IsEmpty()) {
+            TryCatch tryCatch;
+            request->cbFinish->Call(Context::GetCurrent()->Global(), 0, NULL);
+            if (tryCatch.HasCaught()) {
+                node::FatalException(tryCatch);
+            }
         }
 
-        if (request->result != NULL) {
-            delete request->result;
-        }
-
-        request->cbStart.Dispose();
-        request->cbFinish.Dispose();
-        request->cbSuccess.Dispose();
-        request->cbError.Dispose();
-        request->cbEach.Dispose();
-
-        delete request;
+        eioQueryRequestFree(request);
     } else {
         request->drizzle->Ref();
         eio_custom(eioQueryEach, EIO_PRI_DEFAULT, eioQueryEachFinished, request);
         ev_ref(EV_DEFAULT_UC);
     }
+}
+
+void Drizzle::eioQueryRequestFree(query_request_t* request) {
+    if (request->result != NULL) {
+        if (request->rows != NULL) {
+            uint16_t columnCount = request->result->columnCount();
+            for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator) {
+                std::string** row = *iterator;
+                for (uint16_t i=0; i < columnCount; i++) {
+                    if (row[i] != NULL) {
+                        delete row[i];
+                    }
+                }
+                delete [] row;
+            }
+
+            delete request->rows;
+        }
+
+        delete request->result;
+    }
+
+    request->cbStart.Dispose();
+    request->cbFinish.Dispose();
+    request->cbSuccess.Dispose();
+    request->cbError.Dispose();
+    request->cbEach.Dispose();
+
+    delete request;
 }
 
 Local<Object> Drizzle::row(drizzle::Result* result, std::string** currentRow, bool cast) const {
@@ -605,6 +634,11 @@ Local<Object> Drizzle::row(drizzle::Result* result, std::string** currentRow, bo
     }
 
     return row;
+}
+
+std::string Drizzle::parseQuery(const std::string& query, Local<Array> values) const throw(std::exception&) {
+    std::string parsed(query);
+    return parsed;
 }
 
 uint64_t Drizzle::parseDate(const std::string& value, bool hasTime) const throw(std::exception&) {
