@@ -72,10 +72,10 @@ class Drizzle : public node::EventEmitter {
         static void eioQueryCleanup(query_request_t* request);
         static void eioQueryRequestFree(query_request_t* request);
         Local<Object> row(drizzle::Result* result, std::string** currentRow, bool cast) const;
+        std::string parseQuery(const std::string& query, Local<Array> values) const throw(drizzle::Exception&);
+        std::string value(Local<Value> value) const throw(drizzle::Exception&);
 
     private:
-        std::string parseQuery(const std::string& query, Local<Array> values) const throw(drizzle::Exception&);
-
         // Parsing code borrowed from https://github.com/Sannis/node-mysql-libmysqlclient
         uint64_t parseDate(const std::string& value, bool hasTime) const throw(drizzle::Exception&);
         uint16_t parseTime(const std::string& value) const;

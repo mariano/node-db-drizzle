@@ -55,6 +55,36 @@ drizzle.query("SELECT * FROM users WHERE id = ? AND created > ?",
     }
 );
 
+drizzle.query("SELECT * FROM users WHERE id IN ?", 
+    [ [1, 2] ],
+    {
+        start: function(query) {
+            assert.equal("SELECT * FROM users WHERE id IN (1,2)", query);
+            return false;
+        }
+    }
+);
+
+drizzle.query("SELECT * FROM users WHERE role IN ?", 
+    [ ["admin", "moderator"] ],
+    {
+        start: function(query) {
+            assert.equal("SELECT * FROM users WHERE role IN ('admin','moderator')", query);
+            return false;
+        }
+    }
+);
+
+drizzle.query("SELECT * FROM users WHERE name IN ?", 
+    [ ["John Doe", "Jane O'Hara"] ],
+    {
+        start: function(query) {
+            assert.equal("SELECT * FROM users WHERE name IN ('John Doe','Jane O\\'Hara')", query);
+            return false;
+        }
+    }
+);
+
 drizzle.query("SELECT *, 'Use ? mark' FROM users WHERE id = ? AND created > ?", 
     [ 2, "2011-03-09 12:00:00" ],
     {

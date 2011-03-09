@@ -691,25 +691,38 @@ std::string Drizzle::parseQuery(const std::string& query, Local<Array> values) c
     uint32_t index = 0;
     delta = 0;
     for (std::vector<std::string::size_type>::iterator iterator = positions.begin(), end = positions.end(); iterator != end; ++iterator, index++) {
-        Local<Value> currentValue = values->Get(index);
-        std::ostringstream currentStream;
-
-        if (currentValue->IsBoolean()) {
-            currentStream << (currentValue->IsTrue() ? "1" : "0");
-        } else if (currentValue->IsNumber()) {
-            currentStream << currentValue->ToNumber()->Value();
-        } else if (currentValue->IsString()) {
-            String::Utf8Value currentString(currentValue->ToString());
-            std::string string = *currentString;
-            currentStream << '\'' <<  this->connection->escape(string) << '\'';
-        }
-
-        std::string value = currentStream.str();
+        std::string value = this->value(values->Get(index));
         parsed.replace(*iterator + delta, 1, value);
         delta += (value.length() - 1);
     }
 
     return parsed;
+}
+
+std::string Drizzle::value(Local<Value> value) const throw(drizzle::Exception&) {
+    std::ostringstream currentStream;
+
+    if (value->IsArray()) {
+        Local<Array> array = Array::Cast(*value);
+        currentStream << "(";
+        for (uint32_t i = 0, limiti=array->Length(); i < limiti; i++) {
+            if (i > 0) {
+                currentStream << ",";
+            }
+            currentStream << this->value(array->Get(i));
+        }
+        currentStream << ")";
+    } else if (value->IsBoolean()) {
+        currentStream << (value->IsTrue() ? "1" : "0");
+    } else if (value->IsNumber()) {
+        currentStream << value->ToNumber()->Value();
+    } else if (value->IsString()) {
+        String::Utf8Value currentString(value->ToString());
+        std::string string = *currentString;
+        currentStream << '\'' <<  this->connection->escape(string) << '\'';
+    }
+
+    return currentStream.str();
 }
 
 uint64_t Drizzle::parseDate(const std::string& value, bool hasTime) const throw(drizzle::Exception&) {
