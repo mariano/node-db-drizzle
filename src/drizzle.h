@@ -73,7 +73,7 @@ class Drizzle : public node::EventEmitter {
         static void eioQueryRequestFree(query_request_t* request);
         Local<Object> row(drizzle::Result* result, std::string** currentRow, bool cast) const;
         std::string parseQuery(const std::string& query, Local<Array> values) const throw(drizzle::Exception&);
-        std::string value(Local<Value> value) const throw(drizzle::Exception&);
+        std::string value(Local<Value> value, bool inArray=false) const throw(drizzle::Exception&);
 
     private:
         uint64_t toDate(const std::string& value, bool hasTime) const throw(drizzle::Exception&);

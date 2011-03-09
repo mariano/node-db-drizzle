@@ -699,16 +699,26 @@ std::string Drizzle::parseQuery(const std::string& query, Local<Array> values) c
     return parsed;
 }
 
-std::string Drizzle::value(Local<Value> value) const throw(drizzle::Exception&) {
+std::string Drizzle::value(Local<Value> value, bool inArray) const throw(drizzle::Exception&) {
     std::ostringstream currentStream;
 
     if (value->IsArray()) {
         Local<Array> array = Array::Cast(*value);
+        if (!inArray) {
+            currentStream << "(";
+        }
         for (uint32_t i = 0, limiti=array->Length(); i < limiti; i++) {
-            if (i > 0) {
+            Local<Value> child = array->Get(i);
+            if (child->IsArray() && i > 0) {
+                currentStream << "),(";
+            } else if (i > 0) {
                 currentStream << ",";
             }
-            currentStream << this->value(array->Get(i));
+
+            currentStream << this->value(child, true);
+        }
+        if (!inArray) {
+            currentStream << ")";
         }
     } else if (value->IsDate()) {
         currentStream << '\'' <<  this->fromDate(Date::Cast(*value)->NumberValue()) << '\'';
