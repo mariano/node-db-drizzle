@@ -23,6 +23,7 @@ void Drizzle::Init(Handle<Object> target) {
 
     NODE_SET_PROTOTYPE_METHOD(functionTemplate, "connect", Connect);
     NODE_SET_PROTOTYPE_METHOD(functionTemplate, "disconnect", Disconnect);
+    NODE_SET_PROTOTYPE_METHOD(functionTemplate, "escape", Escape);
     NODE_SET_PROTOTYPE_METHOD(functionTemplate, "query", Query);
 
     target->Set(String::NewSymbol("Drizzle"), functionTemplate->GetFunction());
@@ -193,6 +194,20 @@ Handle<Value> Drizzle::Disconnect(const Arguments& args) {
     return Undefined();
 }
 
+Handle<Value> Drizzle::Escape(const Arguments& args) {
+    HandleScope scope;
+
+    ARG_CHECK_STRING(0, string);
+
+    Drizzle *drizzle = ObjectWrap::Unwrap<Drizzle>(args.This());
+    assert(drizzle);
+
+    String::Utf8Value string(args[0]->ToString());
+    std::string unescaped(*string);
+
+    return String::New(drizzle->connection->escape(unescaped).c_str());
+}
+
 Handle<Value> Drizzle::Query(const Arguments& args) {
     HandleScope scope;
 
@@ -266,15 +281,15 @@ Handle<Value> Drizzle::Query(const Arguments& args) {
     }
 
     try {
-        request->query = drizzle->parseQuery(request->query, values);
-    } catch(std::exception& exception) {
-        return ThrowException(Exception::Error(String::New("Wrong number of values to escape")));
+        request->query = drizzle->parseQuery(drizzle->connection, request->query, values);
+    } catch(drizzle::Exception& exception) {
+        return ThrowException(Exception::Error(String::New(exception.what())));
     }
 
-    Local<Value> argv[1];
-    argv[0] = String::New(request->query.c_str());
-
     if (!request->cbStart.IsEmpty()) {
+        Local<Value> argv[1];
+        argv[0] = String::New(request->query.c_str());
+
         TryCatch tryCatch;
         Handle<Value> result = request->cbStart->Call(Context::GetCurrent()->Global(), 1, argv);
         if (tryCatch.HasCaught()) {
@@ -421,7 +436,7 @@ int Drizzle::eioQueryFinished(eio_req* eioRequest) {
             }
         }
 
-        if (!request->cbEach.IsEmpty() && request->buffer) {
+        if (request->buffer && !request->cbEach.IsEmpty()) {
             uint64_t index=0;
             for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator, index++) {
                 Local<Value> eachArgv[3];
@@ -589,7 +604,7 @@ Local<Object> Drizzle::row(drizzle::Result* result, std::string** currentRow, bo
                     case drizzle::Result::Column::DATE:
                         try {
                             value = Date::New(this->parseDate(*currentRow[j], false));
-                        } catch(std::exception&) {
+                        } catch(drizzle::Exception&) {
                             value = String::New(currentValue);
                         }
                         break;
@@ -599,7 +614,7 @@ Local<Object> Drizzle::row(drizzle::Result* result, std::string** currentRow, bo
                     case drizzle::Result::Column::DATETIME:
                         try {
                             value = Date::New(this->parseDate(*currentRow[j], true));
-                        } catch(std::exception&) {
+                        } catch(drizzle::Exception&) {
                             value = String::New(currentValue);
                         }
                         break;
@@ -636,12 +651,61 @@ Local<Object> Drizzle::row(drizzle::Result* result, std::string** currentRow, bo
     return row;
 }
 
-std::string Drizzle::parseQuery(const std::string& query, Local<Array> values) const throw(std::exception&) {
+std::string Drizzle::parseQuery(const drizzle::Connection* connection, const std::string& query, Local<Array> values) const throw(drizzle::Exception&) {
     std::string parsed(query);
+    std::vector<std::string::size_type> positions;
+    char quote = 0;
+    bool escaped = false;
+    uint32_t delta = 0;
+
+    for (std::string::size_type i=0, limiti=query.length(); i < limiti; i++) {
+        char currentChar = query[i];
+        if (escaped) {
+            if (currentChar == '?') {
+                parsed.replace(i - 1 - delta, 1, "");
+                delta++;
+            }
+            escaped = false;
+        } else if (currentChar == '\\') {
+            escaped = true;
+        } else if (quote && currentChar == quote) {
+            quote = 0;
+        } else if (!quote && (currentChar == '\'' || currentChar == '"')) {
+            quote = currentChar;
+        } else if (!quote && currentChar == '?') {
+            positions.push_back(i - delta);
+        }
+    }
+
+    if (positions.size() != values->Length()) {
+        throw drizzle::Exception("Wrong number of values to escape");
+    }
+
+    uint32_t index = 0;
+    delta = 0;
+    for (std::vector<std::string::size_type>::iterator iterator = positions.begin(), end = positions.end(); iterator != end; ++iterator, index++) {
+        Local<Value> currentValue = values->Get(index);
+        std::ostringstream currentStream;
+
+        if (currentValue->IsBoolean()) {
+            currentStream << (currentValue->IsTrue() ? "1" : "0");
+        } else if (currentValue->IsNumber()) {
+            currentStream << currentValue->ToNumber()->Value();
+        } else if (currentValue->IsString()) {
+            String::Utf8Value currentString(currentValue->ToString());
+            std::string string = *currentString;
+            currentStream << '\'' <<  connection->escape(string) << '\'';
+        }
+
+        std::string value = currentStream.str();
+        parsed.replace(*iterator + delta, 1, value);
+        delta += (value.length() - 1);
+    }
+
     return parsed;
 }
 
-uint64_t Drizzle::parseDate(const std::string& value, bool hasTime) const throw(std::exception&) {
+uint64_t Drizzle::parseDate(const std::string& value, bool hasTime) const throw(drizzle::Exception&) {
     int day, month, year, hour, min, sec;
     int localHour, gmtHour, localMin, gmtMin;
     time_t rawtime;
@@ -649,13 +713,13 @@ uint64_t Drizzle::parseDate(const std::string& value, bool hasTime) const throw(
 
     time(&rawtime);
     if (!localtime_r(&rawtime, &timeinfo)) {
-        throw std::exception();
+        throw drizzle::Exception("Can't get local time");
     }
     localHour = timeinfo.tm_hour - (timeinfo.tm_isdst > 0 ? 1 : 0);
     localMin = timeinfo.tm_min;
 
     if (!gmtime_r(&rawtime, &timeinfo)) {
-        throw std::exception();
+        throw drizzle::Exception("Can't get GMT time");
     }
     gmtHour = timeinfo.tm_hour;
     gmtMin = timeinfo.tm_min;

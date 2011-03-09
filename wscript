@@ -15,9 +15,7 @@ VERSION = "1.2.3"
 
 def set_options(opt):
   opt.tool_options("compiler_cxx")
-  opt.add_option('--all', action='store_true', help='Run all tests (include slow, exclude ignored)')
-  opt.add_option('--slow', action='store_true', help='Run slow tests')
-  opt.add_option('--ignored', action='store_true', help='Run ignored tests')
+  opt.add_option('--nodeunit', action='store_true', help='Run tests with nodeunit')
   opt.add_option('--debug', action='store_true', help='Run tests with node_g')
   opt.add_option('--warn', action='store_true', help='Enable extra -W* compiler flags')
 
@@ -46,23 +44,13 @@ def build(bld):
   obj.uselib = "DRIZZLE"
 
 def test(tst):
-  nodeunit_binary = 'nodeunit'
-  if Options.options.debug:
-    nodeunit_binary = 'nodeunit_g'
+  test_binary = 'node'
+  if Options.options.nodeunit:
+    test_binary = 'nodeunit'
+  elif Options.options.debug:
+    test_binary = 'nodeunit_g'
   
-  if Options.options.slow and Options.options.ignored:
-    Utils.exec_command(nodeunit_binary + ' tests/slow tests/ignored')
-  else:
-    if Options.options.slow:
-      Utils.exec_command(nodeunit_binary + ' tests/slow')
-    else:
-      if Options.options.ignored:
-        Utils.exec_command(nodeunit_binary + ' tests/ignored')
-      else:
-        if Options.options.all:
-          Utils.exec_command(nodeunit_binary + ' tests/simple tests/complex tests/slow')
-        else:
-          Utils.exec_command(nodeunit_binary + ' tests/simple tests/complex')
+  Utils.exec_command(test_binary + ' tests.js')
 
 def lint(lnt):
   # Bindings C++ source code

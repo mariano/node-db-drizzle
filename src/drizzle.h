@@ -2,7 +2,6 @@
 #define _NODE_DRIZZLE__DRIZZLE_H
 
 #include <stdlib.h>
-#include <exception>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -10,6 +9,7 @@
 #include <node_buffer.h>
 #include <node_events.h>
 #include "drizzle/connection.h"
+#include "drizzle/exception.h"
 #include "drizzle/result.h"
 #include "drizzle_bindings.h"
 
@@ -59,6 +59,7 @@ class Drizzle : public node::EventEmitter {
         static Handle<Value> New(const Arguments& args);
         static Handle<Value> Connect(const Arguments& args);
         static Handle<Value> Disconnect(const Arguments& args);
+        static Handle<Value> Escape(const Arguments& args);
         static Handle<Value> Query(const Arguments& args);
         static int eioConnect(eio_req* req);
         static void connect(connect_request_t* request);
@@ -73,10 +74,10 @@ class Drizzle : public node::EventEmitter {
         Local<Object> row(drizzle::Result* result, std::string** currentRow, bool cast) const;
 
     private:
-        std::string parseQuery(const std::string& query, Local<Array> values) const throw(std::exception&);
+        std::string parseQuery(const drizzle::Connection* connection, const std::string& query, Local<Array> values) const throw(drizzle::Exception&);
 
         // Parsing code borrowed from https://github.com/Sannis/node-mysql-libmysqlclient
-        uint64_t parseDate(const std::string& value, bool hasTime) const throw(std::exception&);
+        uint64_t parseDate(const std::string& value, bool hasTime) const throw(drizzle::Exception&);
         uint16_t parseTime(const std::string& value) const;
 };
 }

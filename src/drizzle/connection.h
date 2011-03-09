@@ -27,6 +27,7 @@ class Connection {
         bool isOpened() const;
         void open() throw(Exception&);
         void close();
+        std::string escape(const std::string& string) const throw(Exception&);
         std::string version() const;
         Result* query(const std::string& query) const throw(Exception&);
 

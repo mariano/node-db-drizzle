@@ -132,6 +132,19 @@ void Connection::close() {
     this->opened = false;
 }
 
+std::string Connection::escape(const std::string& string) const throw(Exception&) {
+    char* buffer = new char[string.length() * 2 + 1];
+    if (buffer == NULL) {
+        throw Exception("Can\'t create buffer to escape string");
+    }
+
+    drizzle_escape_string(buffer, string.c_str(), string.length());
+
+    std::string escaped = buffer;
+    delete [] buffer;
+    return escaped;
+}
+
 std::string Connection::version() const {
     std::string version;
     if (this->opened) {
