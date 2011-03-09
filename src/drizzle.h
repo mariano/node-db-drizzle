@@ -76,9 +76,11 @@ class Drizzle : public node::EventEmitter {
         std::string value(Local<Value> value) const throw(drizzle::Exception&);
 
     private:
-        // Parsing code borrowed from https://github.com/Sannis/node-mysql-libmysqlclient
-        uint64_t parseDate(const std::string& value, bool hasTime) const throw(drizzle::Exception&);
-        uint16_t parseTime(const std::string& value) const;
+        uint64_t toDate(const std::string& value, bool hasTime) const throw(drizzle::Exception&);
+        std::string fromDate(const uint64_t timeStamp) const throw(drizzle::Exception&);
+        uint64_t toTime(const std::string& value) const;
+        // GMT delta calculation borrowed from https://github.com/Sannis/node-mysql-libmysqlclient
+        int gmtDelta() const throw(drizzle::Exception&);
 };
 }
 

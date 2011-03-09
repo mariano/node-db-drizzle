@@ -55,7 +55,17 @@ drizzle.query("SELECT * FROM users WHERE id = ? AND created > ?",
     }
 );
 
-drizzle.query("SELECT * FROM users WHERE id IN ?", 
+drizzle.query("SELECT * FROM users WHERE id = ? AND created > ?", 
+    [ 2, new Date(2011, 3-1, 9, 12, 0, 0) ],
+    {
+        start: function(query) {
+            assert.equal("SELECT * FROM users WHERE id = 2 AND created > '2011-03-09 12:00:00'", query);
+            return false;
+        }
+    }
+);
+
+drizzle.query("SELECT * FROM users WHERE id IN (?)", 
     [ [1, 2] ],
     {
         start: function(query) {
@@ -65,7 +75,7 @@ drizzle.query("SELECT * FROM users WHERE id IN ?",
     }
 );
 
-drizzle.query("SELECT * FROM users WHERE role IN ?", 
+drizzle.query("SELECT * FROM users WHERE role IN (?)", 
     [ ["admin", "moderator"] ],
     {
         start: function(query) {
@@ -75,11 +85,29 @@ drizzle.query("SELECT * FROM users WHERE role IN ?",
     }
 );
 
-drizzle.query("SELECT * FROM users WHERE name IN ?", 
+drizzle.query("SELECT * FROM users WHERE name IN (?)", 
     [ ["John Doe", "Jane O'Hara"] ],
     {
         start: function(query) {
             assert.equal("SELECT * FROM users WHERE name IN ('John Doe','Jane O\\'Hara')", query);
+            return false;
+        }
+    }
+);
+
+var created = new Date();
+drizzle.query("INSERT INTO users(username,name,age,created,approved) VALUES(?)", 
+    [ ["jane", "Jane O'Hara", 32, created, true] ],
+    {
+        start: function(query) {
+            var sCreated = created.getFullYear() + "-";
+            sCreated += (created.getMonth() < 9 ? "0" : "") + (created.getMonth() + 1) + "-";
+            sCreated += (created.getDate() < 10 ? "0" : "") + created.getDate() + " ";
+            sCreated += (created.getHours() < 10 ? "0" : "") + created.getHours() + ":";
+            sCreated += (created.getMinutes() < 10 ? "0" : "") + created.getMinutes() + ":";
+            sCreated += (created.getSeconds() < 10 ? "0" : "") + created.getSeconds();
+
+            assert.equal("INSERT INTO users(username,name,age,created,approved) VALUES('jane','Jane O\\'Hara',32,'" + sCreated + "',1)", query);
             return false;
         }
     }

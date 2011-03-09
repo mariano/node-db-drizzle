@@ -610,17 +610,17 @@ Local<Object> Drizzle::row(drizzle::Result* result, std::string** currentRow, bo
                         break;
                     case drizzle::Result::Column::DATE:
                         try {
-                            value = Date::New(this->parseDate(*currentRow[j], false));
+                            value = Date::New(this->toDate(*currentRow[j], false));
                         } catch(drizzle::Exception&) {
                             value = String::New(currentValue);
                         }
                         break;
                     case drizzle::Result::Column::TIME:
-                        value = Date::New(this->parseTime(*currentRow[j]));
+                        value = Date::New(this->toTime(*currentRow[j]));
                         break;
                     case drizzle::Result::Column::DATETIME:
                         try {
-                            value = Date::New(this->parseDate(*currentRow[j], true));
+                            value = Date::New(this->toDate(*currentRow[j], true));
                         } catch(drizzle::Exception&) {
                             value = String::New(currentValue);
                         }
@@ -704,14 +704,14 @@ std::string Drizzle::value(Local<Value> value) const throw(drizzle::Exception&) 
 
     if (value->IsArray()) {
         Local<Array> array = Array::Cast(*value);
-        currentStream << "(";
         for (uint32_t i = 0, limiti=array->Length(); i < limiti; i++) {
             if (i > 0) {
                 currentStream << ",";
             }
             currentStream << this->value(array->Get(i));
         }
-        currentStream << ")";
+    } else if (value->IsDate()) {
+        currentStream << '\'' <<  this->fromDate(Date::Cast(*value)->NumberValue()) << '\'';
     } else if (value->IsBoolean()) {
         currentStream << (value->IsTrue() ? "1" : "0");
     } else if (value->IsNumber()) {
@@ -725,8 +725,56 @@ std::string Drizzle::value(Local<Value> value) const throw(drizzle::Exception&) 
     return currentStream.str();
 }
 
-uint64_t Drizzle::parseDate(const std::string& value, bool hasTime) const throw(drizzle::Exception&) {
+uint64_t Drizzle::toDate(const std::string& value, bool hasTime) const throw(drizzle::Exception&) {
     int day, month, year, hour, min, sec;
+
+    if (hasTime) {
+        sscanf(value.c_str(), "%d-%d-%d %d:%d:%d", &year, &month, &day, &hour, &min, &sec);
+    } else {
+        sscanf(value.c_str(), "%d-%d-%d", &year, &month, &day);
+        hour = min = sec = 0;
+    }
+
+    time_t rawtime;
+    struct tm timeinfo;
+
+    time(&rawtime);
+    if (!localtime_r(&rawtime, &timeinfo)) {
+        throw drizzle::Exception("Can't get local time");
+    }
+
+    timeinfo.tm_year = year - 1900;
+    timeinfo.tm_mon = month - 1;
+    timeinfo.tm_mday = day;
+    timeinfo.tm_hour = hour;
+    timeinfo.tm_min = min;
+    timeinfo.tm_sec = sec;
+
+    return static_cast<uint64_t>((mktime(&timeinfo) + this->gmtDelta()) * 1000);
+}
+
+std::string Drizzle::fromDate(const uint64_t timeStamp) const throw(drizzle::Exception&) {
+    char* buffer=new char[20];
+    if (buffer == NULL) {
+        throw drizzle::Exception("Can\'t create buffer to write parsed date");
+    }
+
+
+    struct tm timeinfo;
+    time_t rawtime = timeStamp / 1000;
+    if (!localtime_r(&rawtime, &timeinfo)) {
+        throw drizzle::Exception("Can't get local time");
+    }
+
+    strftime(buffer, 20, "%Y-%m-%d %H:%M:%S", &timeinfo);
+
+    std::string date(buffer);
+    delete [] buffer;
+
+    return date;
+}
+
+int Drizzle::gmtDelta() const throw(drizzle::Exception&) {
     int localHour, gmtHour, localMin, gmtMin;
     time_t rawtime;
     struct tm timeinfo;
@@ -747,31 +795,30 @@ uint64_t Drizzle::parseDate(const std::string& value, bool hasTime) const throw(
     int gmtDelta = ((localHour - gmtHour) * 60 + (localMin - gmtMin)) * 60;
     if (gmtDelta <= -(12 * 60 * 60)) {
         gmtDelta += 24 * 60 * 60;
-    }
+    } else
     if (gmtDelta > (12 * 60 * 60)) {
         gmtDelta -= 24 * 60 * 60;
     }
 
-    if (hasTime) {
-        sscanf(value.c_str(), "%d-%d-%d %d:%d:%d", &year, &month, &day, &hour, &min, &sec);
-    } else {
-        sscanf(value.c_str(), "%d-%d-%d", &year, &month, &day);
-        hour = min = sec = 0;
+    return gmtDelta;
+}
+
+uint64_t Drizzle::toTime(const std::string& value) const {
+    int hour, min, sec;
+
+    sscanf(value.c_str(), "%d:%d:%d", &hour, &min, &sec);
+
+    time_t rawtime;
+    struct tm timeinfo;
+
+    time(&rawtime);
+    if (!localtime_r(&rawtime, &timeinfo)) {
+        throw drizzle::Exception("Can't get local time");
     }
 
-    timeinfo.tm_year = year - 1900;
-    timeinfo.tm_mon = month - 1;
-    timeinfo.tm_mday = day;
     timeinfo.tm_hour = hour;
     timeinfo.tm_min = min;
     timeinfo.tm_sec = sec;
-    rawtime = mktime(&timeinfo);
 
-    return static_cast<uint64_t>((rawtime + gmtDelta) * 1000);
-}
-
-uint16_t Drizzle::parseTime(const std::string& value) const {
-    int hour, min, sec;
-    sscanf(value.c_str(), "%d:%d:%d", &hour, &min, &sec);
-    return (hour * 60 * 60 + min * 60 + sec);
+    return static_cast<uint64_t>((mktime(&timeinfo) + this->gmtDelta()) * 1000);
 }
