@@ -1,82 +1,80 @@
-#include "connection.h"
+// Copyright 2011 Mariano Iglesias <mgiglesias@gmail.com>
+#include "./connection.h"
 
-using namespace drizzle;
-
-Connection::Connection():
-    port(3306),
+drizzle::Connection::Connection()
+    :port(3306),
     mysql(true),
     opened(false),
     drizzle(NULL),
-    connection(NULL)
-{
+    connection(NULL) {
 }
 
-Connection::~Connection() {
+drizzle::Connection::~Connection() {
     this->close();
     if (this->drizzle != NULL) {
         drizzle_free(this->drizzle);
     }
 }
 
-std::string Connection::getHostname() const {
+std::string drizzle::Connection::getHostname() const {
     return this->hostname;
 }
 
-void Connection::setHostname(const std::string& hostname) {
+void drizzle::Connection::setHostname(const std::string& hostname) {
     this->hostname = hostname;
 }
 
-std::string Connection::getUser() const {
+std::string drizzle::Connection::getUser() const {
     return this->user;
 }
 
-void Connection::setUser(const std::string& user) {
+void drizzle::Connection::setUser(const std::string& user) {
     this->user = user;
 }
 
-std::string Connection::getPassword() const {
+std::string drizzle::Connection::getPassword() const {
     return this->password;
 }
 
-void Connection::setPassword(const std::string& password) {
+void drizzle::Connection::setPassword(const std::string& password) {
     this->password = password;
 }
 
-std::string Connection::getDatabase() const {
+std::string drizzle::Connection::getDatabase() const {
     return this->database;
 }
 
-void Connection::setDatabase(const std::string& database) {
+void drizzle::Connection::setDatabase(const std::string& database) {
     this->database = database;
 }
 
-uint32_t Connection::getPort() const {
+uint32_t drizzle::Connection::getPort() const {
     return this->port;
 }
 
-void Connection::setPort(uint32_t port) {
+void drizzle::Connection::setPort(uint32_t port) {
     this->port = port;
 }
 
-bool Connection::isMysql() const {
+bool drizzle::Connection::isMysql() const {
     return this->mysql;
 }
 
-void Connection::setMysql(bool mysql) {
+void drizzle::Connection::setMysql(bool mysql) {
     this->mysql = mysql;
 }
 
-bool Connection::isOpened() const {
+bool drizzle::Connection::isOpened() const {
     return this->opened;
 }
 
-void Connection::open() throw(Exception&) {
+void drizzle::Connection::open() throw(drizzle::Exception&) {
     this->close();
 
     if (this->drizzle == NULL) {
         this->drizzle = drizzle_create(NULL);
         if (this->drizzle == NULL) {
-            throw Exception("Cannot create drizzle structure");
+            throw drizzle::Exception("Cannot create drizzle structure");
         }
 
         drizzle_add_options(this->drizzle, DRIZZLE_NON_BLOCKING);
@@ -84,7 +82,7 @@ void Connection::open() throw(Exception&) {
 
     this->connection = drizzle_con_create(this->drizzle, NULL);
     if (this->connection == NULL) {
-        throw Exception("Cannot create connection structure");
+        throw drizzle::Exception("Cannot create connection structure");
     }
 
     drizzle_con_set_tcp(this->connection, this->hostname.c_str(), this->port);
@@ -102,15 +100,15 @@ void Connection::open() throw(Exception&) {
                 this->opened = true;
                 break;
             } else if (result != DRIZZLE_RETURN_IO_WAIT) {
-                throw Exception(drizzle_con_error(this->connection));
+                throw drizzle::Exception(drizzle_con_error(this->connection));
             }
 
             if (drizzle_con_wait(this->drizzle) != DRIZZLE_RETURN_OK) {
-                throw Exception("Could not wait for connection");
+                throw drizzle::Exception("Could not wait for connection");
             }
 
             if (drizzle_con_ready(this->drizzle) == NULL) {
-                throw Exception("Could not fetch connection");
+                throw drizzle::Exception("Could not fetch connection");
             }
         }
     } catch(...) {
@@ -123,7 +121,7 @@ void Connection::open() throw(Exception&) {
     }
 }
 
-void Connection::close() {
+void drizzle::Connection::close() {
     if (this->connection != NULL) {
         drizzle_con_close(this->connection);
         drizzle_con_free(this->connection);
@@ -132,10 +130,10 @@ void Connection::close() {
     this->opened = false;
 }
 
-std::string Connection::escape(const std::string& string) const throw(Exception&) {
+std::string drizzle::Connection::escape(const std::string& string) const throw(drizzle::Exception&) {
     char* buffer = new char[string.length() * 2 + 1];
     if (buffer == NULL) {
-        throw Exception("Can\'t create buffer to escape string");
+        throw drizzle::Exception("Can\'t create buffer to escape string");
     }
 
     drizzle_escape_string(buffer, string.c_str(), string.length());
@@ -145,7 +143,7 @@ std::string Connection::escape(const std::string& string) const throw(Exception&
     return escaped;
 }
 
-std::string Connection::version() const {
+std::string drizzle::Connection::version() const {
     std::string version;
     if (this->opened) {
         version = drizzle_con_server_version(this->connection);
@@ -153,9 +151,9 @@ std::string Connection::version() const {
     return version;
 }
 
-Result* Connection::query(const std::string& query) const throw(Exception&) {
+drizzle::Result* drizzle::Connection::query(const std::string& query) const throw(drizzle::Exception&) {
     if (!this->opened) {
-        throw Exception("Can't execute query without an opened connection");
+        throw drizzle::Exception("Can't execute query without an opened connection");
     }
 
     drizzle_result_st *result = NULL;
@@ -168,17 +166,17 @@ Result* Connection::query(const std::string& query) const throw(Exception&) {
                 break;
             } else if (executed != DRIZZLE_RETURN_IO_WAIT) {
                 if (executed == DRIZZLE_RETURN_LOST_CONNECTION) {
-                    throw Exception("Lost connection while executing query");
+                    throw drizzle::Exception("Lost connection while executing query");
                 }
-                throw Exception(drizzle_con_error(this->connection));
+                throw drizzle::Exception(drizzle_con_error(this->connection));
             }
 
             if (drizzle_con_wait(this->drizzle) != DRIZZLE_RETURN_OK) {
-                throw Exception("Could not wait for connection");
+                throw drizzle::Exception("Could not wait for connection");
             }
 
             if (drizzle_con_ready(this->drizzle) == NULL) {
-                throw Exception("Could not fetch connection");
+                throw drizzle::Exception("Could not fetch connection");
             }
         }
     } catch(...) {
@@ -189,8 +187,8 @@ Result* Connection::query(const std::string& query) const throw(Exception&) {
     }
 
     if (result == NULL) {
-        throw Exception("Could not fetch result of query");
+        throw drizzle::Exception("Could not fetch result of query");
     }
 
-    return new Result(this->drizzle, result);
+    return new drizzle::Result(this->drizzle, result);
 }

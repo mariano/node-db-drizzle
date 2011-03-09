@@ -55,10 +55,10 @@ def test(tst):
 def lint(lnt):
   # Bindings C++ source code
   print("Run CPPLint:")
-  Utils.exec_command('cpplint ./src/drizzle/*.h ./src/drizzle/*.cc ./src/*.h ./src/*.cc')
+  Utils.exec_command('cpplint --filter=-whitespace/line_length ./src/drizzle/*.h ./src/drizzle/*.cc ./src/*.h ./src/*.cc')
   # Bindings javascript code, docs and tools
   print("Run Nodelint for sources:")
-  Utils.exec_command('nodelint ./package.json ./drizzle.js ./doc')
+  Utils.exec_command('nodelint ./package.json ./drizzle.js')
 
 def doc(doc):
   description = ('--desc "Drizzle/MySQL bindings for [Node.js](http://nodejs.org) using libdrizzle.\n\n' +
@@ -66,7 +66,7 @@ def doc(doc):
                  'Extra information: ')
   ribbon = '--ribbon "http://github.com/mariano/node-drizzle" '
   
-  downloads = ('--desc-rigth "' +
+  downloads = ('--desc-right "' +
                'Latest version ' + VERSION + ':<br/>\n' +
                '<a href="http://github.com/mariano/node-drizzle/zipball/v' + VERSION + '">\n' +
                ' <img width="90" src="http://github.com/images/modules/download/zip.png" />\n' +
@@ -81,7 +81,6 @@ def doc(doc):
                      '[ChangeLog](./changelog.html), [API](./api.html), [Examples](./examples.html), [Wiki](http://github.com/mariano/node-drizzle/wiki)." ' +
                      ribbon +
                      downloads +
-                     '--ignore-filenames ' +
                      './README.markdown ' +
                      '> ./doc/index.html')
   print("Parse CHANGELOG.markdown:")
@@ -89,7 +88,6 @@ def doc(doc):
                      description +
                      '[Homepage](./index.html), [API](./api.html), [Examples](./examples.html), [Wiki](http://github.com/mariano/node-drizzle/wiki)." ' +
                      ribbon +
-                     '--ignore-filenames ' +
                      './CHANGELOG.markdown ' +
                      '> ./doc/changelog.html')
   print("Parse API documentation:")

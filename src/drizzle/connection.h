@@ -1,11 +1,12 @@
-#ifndef _NODE_DRIZZLE__CONNECTION_H
-#define _NODE_DRIZZLE__CONNECTION_H
+// Copyright 2011 Mariano Iglesias <mgiglesias@gmail.com>
+#ifndef SRC_DRIZZLE_CONNECTION_H_
+#define SRC_DRIZZLE_CONNECTION_H_
 
-#include <string>
 #include <libdrizzle/drizzle.h>
 #include <libdrizzle/drizzle_client.h>
-#include "exception.h"
-#include "result.h"
+#include <string>
+#include "./exception.h"
+#include "./result.h"
 
 namespace drizzle {
 class Connection {
@@ -46,4 +47,4 @@ class Connection {
 };
 }
 
-#endif
+#endif  // SRC_DRIZZLE_CONNECTION_H_

@@ -1,11 +1,10 @@
-#include "exception.h"
+// Copyright 2011 Mariano Iglesias <mgiglesias@gmail.com>
+#include "./exception.h"
 
-using namespace drizzle;
-
-Exception::Exception(const char* message) : exception() {
-    this->message = message;
+drizzle::Exception::Exception(const char* message) : exception(),
+    message(message) {
 }
 
-const char* Exception::what() const throw() {
+const char* drizzle::Exception::what() const throw() {
     return this->message;
 }

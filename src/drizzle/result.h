@@ -1,11 +1,12 @@
-#ifndef _DRIZZLE__RESULT_H
-#define _DRIZZLE__RESULT_H
+// Copyright 2011 Mariano Iglesias <mgiglesias@gmail.com>
+#ifndef SRC_DRIZZLE_RESULT_H_
+#define SRC_DRIZZLE_RESULT_H_
 
-#include <string>
-#include <stdexcept>
 #include <libdrizzle/drizzle.h>
 #include <libdrizzle/drizzle_client.h>
-#include "exception.h"
+#include <string>
+#include <stdexcept>
+#include "./exception.h"
 
 namespace drizzle {
 class Result {
@@ -24,7 +25,7 @@ class Result {
                     SET
                 } type_t;
 
-                Column(drizzle_column_st *column);
+                explicit Column(drizzle_column_st *column);
                 ~Column();
                 std::string getName() const;
                 type_t getType() const;
@@ -34,7 +35,7 @@ class Result {
                 type_t type;
         };
 
-        Result(drizzle_st* drizzle, drizzle_result_st* result) throw(Exception&);
+        explicit Result(drizzle_st* drizzle, drizzle_result_st* result) throw(Exception&);
         ~Result();
         bool hasNext() const;
         const char** next() throw(Exception&);
@@ -60,4 +61,4 @@ class Result {
 };
 }
 
-#endif
+#endif  // SRC_DRIZZLE_RESULT_H_

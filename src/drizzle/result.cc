@@ -1,11 +1,10 @@
-#include "result.h"
+// Copyright 2011 Mariano Iglesias <mgiglesias@gmail.com>
+#include "./result.h"
 
-using namespace drizzle;
-
-Result::Column::Column(drizzle_column_st *column) {
+drizzle::Result::Column::Column(drizzle_column_st *column) {
     this->name = drizzle_column_name(column);
 
-    switch(drizzle_column_type(column)) {
+    switch (drizzle_column_type(column)) {
         case DRIZZLE_COLUMN_TYPE_TINY:
             this->type = (drizzle_column_size(column) == 1 ? BOOL : INT);
             break;
@@ -49,33 +48,32 @@ Result::Column::Column(drizzle_column_st *column) {
     }
 }
 
-Result::Column::~Column() {
+drizzle::Result::Column::~Column() {
 }
 
-std::string Result::Column::getName() const {
+std::string drizzle::Result::Column::getName() const {
     return this->name;
 }
 
-Result::Column::type_t Result::Column::getType() const {
+drizzle::Result::Column::type_t drizzle::Result::Column::getType() const {
     return this->type;
 }
 
-Result::Result(drizzle_st* drizzle, drizzle_result_st* result) throw(Exception&):
-    columns(NULL),
+drizzle::Result::Result(drizzle_st* drizzle, drizzle_result_st* result) throw(drizzle::Exception&)
+    : columns(NULL),
     totalColumns(0),
     rowNumber(0),
     drizzle(drizzle),
     result(result),
     previousRow(NULL),
-    nextRow(NULL)
-{
+    nextRow(NULL) {
     if (this->result == NULL) {
-        throw Exception("Invalid result");
+        throw drizzle::Exception("Invalid result");
     }
 
     if (drizzle_column_buffer(this->result) != DRIZZLE_RETURN_OK) {
         drizzle_result_free(this->result);
-        throw Exception("Could not buffer columns");
+        throw drizzle::Exception("Could not buffer columns");
     }
 
     this->totalColumns = drizzle_result_column_count(this->result);
@@ -83,10 +81,10 @@ Result::Result(drizzle_st* drizzle, drizzle_result_st* result) throw(Exception&)
         this->columns = new Column*[this->totalColumns];
         if (this->columns == NULL) {
             drizzle_result_free(this->result);
-            throw Exception("Could not allocate storage for columns");
+            throw drizzle::Exception("Could not allocate storage for columns");
         }
 
-        uint16_t i=0;
+        uint16_t i = 0;
         drizzle_column_st *current;
         while ((current = drizzle_column_next(this->result)) != NULL) {
             this->columns[i++] = new Column(current);
@@ -96,9 +94,9 @@ Result::Result(drizzle_st* drizzle, drizzle_result_st* result) throw(Exception&)
     this->nextRow = this->row();
 }
 
-Result::~Result() {
+drizzle::Result::~Result() {
     if (this->columns != NULL) {
-        for (uint16_t i=0; i < this->totalColumns; i++) {
+        for (uint16_t i = 0; i < this->totalColumns; i++) {
             delete this->columns[i];
         }
         delete [] this->columns;
@@ -114,11 +112,11 @@ Result::~Result() {
     }
 }
 
-bool Result::hasNext() const {
+bool drizzle::Result::hasNext() const {
     return (this->nextRow != NULL);
 }
 
-const char** Result::next() throw(Exception&) {
+const char** drizzle::Result::next() throw(drizzle::Exception&) {
     if (this->previousRow != NULL) {
         drizzle_row_free(this->result, this->previousRow);
     }
@@ -134,7 +132,7 @@ const char** Result::next() throw(Exception&) {
     return (const char**) this->previousRow;
 }
 
-char** Result::row() throw(Exception&) {
+char** drizzle::Result::row() throw(drizzle::Exception&) {
     drizzle_return_t result = DRIZZLE_RETURN_IO_WAIT;
     char **row = NULL;
 
@@ -142,11 +140,11 @@ char** Result::row() throw(Exception&) {
         row = drizzle_row_buffer(this->result, &result);
         if (result == DRIZZLE_RETURN_IO_WAIT) {
             if (drizzle_con_wait(this->drizzle) != DRIZZLE_RETURN_OK) {
-                throw Exception("Could not wait for connection");
+                throw drizzle::Exception("Could not wait for connection");
             }
 
             if (drizzle_con_ready(this->drizzle) == NULL) {
-                throw Exception("Could not fetch connection");
+                throw drizzle::Exception("Could not fetch connection");
             }
         }
     }
@@ -156,38 +154,38 @@ char** Result::row() throw(Exception&) {
             drizzle_row_free(this->result, row);
             row = NULL;
         }
-        throw Exception("Could not prefetch next row");
+        throw drizzle::Exception("Could not prefetch next row");
     }
 
     return row;
 }
 
-uint64_t Result::index() const throw(std::out_of_range&) {
+uint64_t drizzle::Result::index() const throw(std::out_of_range&) {
     if (this->rowNumber == 0) {
         throw std::out_of_range("Not standing on a row");
     }
     return (this->rowNumber - 1);
 }
 
-Result::Column* Result::column(uint16_t i) const throw(std::out_of_range&) {
+drizzle::Result::Column* drizzle::Result::column(uint16_t i) const throw(std::out_of_range&) {
     if (i < 0 || i >= this->totalColumns) {
         throw std::out_of_range("Wrong column index");
     }
     return this->columns[i];
 }
 
-uint64_t Result::insertId() const {
+uint64_t drizzle::Result::insertId() const {
     return drizzle_result_insert_id(this->result);
 }
 
-uint64_t Result::affectedCount() const {
+uint64_t drizzle::Result::affectedCount() const {
     return drizzle_result_affected_rows(this->result);
 }
 
-uint16_t Result::warningCount() const {
+uint16_t drizzle::Result::warningCount() const {
     return drizzle_result_warning_count(this->result);
 }
 
-uint16_t Result::columnCount() const {
+uint16_t drizzle::Result::columnCount() const {
     return this->totalColumns;
 }

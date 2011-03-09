@@ -1,11 +1,10 @@
-#include "drizzle_bindings.h"
-#include "drizzle.h"
-
-using namespace node_drizzle;
+// Copyright 2011 Mariano Iglesias <mgiglesias@gmail.com>
+#include "./drizzle_bindings.h"
+#include "./drizzle.h"
 
 extern "C" {
-    void init(Handle<Object> target) {
-        Drizzle::Init(target);
+    void init(v8::Handle<v8::Object> target) {
+        node_drizzle::Drizzle::Init(target);
     }
 
     NODE_MODULE(drizzle_bindings, init);

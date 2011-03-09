@@ -1,7 +1,8 @@
 { "name" : "drizzle"
-, "description" : "Binary Drizzle bindings for Node.JS"
+, "description" : "Drizzle/MySQL bindings for Node.JS"
 , "homepage" : "http://mariano.github.com/node-drizzle"
 , "version" : "0.1.1"
+, "engines" : { "node" : ">=0.4.1" }
 , "maintainers" :
   [ { "name": "Mariano Iglesias"
     , "email": "mgiglesias@gmail.com"
@@ -19,10 +20,5 @@
   { "install" : "node-waf configure build"
   , "test" : "node-waf test"
   , "doc" : "node-waf doc"
-  }
-, "engines" : { "node" : ">=0.4.1" }
-, "devDependencies" :
-  { "nodeunit" : "*"
-  , "nodelint" : "*"
   }
 }
