@@ -202,10 +202,17 @@ Handle<Value> Drizzle::Escape(const Arguments& args) {
     Drizzle *drizzle = ObjectWrap::Unwrap<Drizzle>(args.This());
     assert(drizzle);
 
-    String::Utf8Value string(args[0]->ToString());
-    std::string unescaped(*string);
+    std::string escaped;
 
-    return String::New(drizzle->connection->escape(unescaped).c_str());
+    try {
+        String::Utf8Value string(args[0]->ToString());
+        std::string unescaped(*string);
+        escaped = drizzle->connection->escape(unescaped);
+    } catch(drizzle::Exception& exception) {
+        return ThrowException(Exception::Error(String::New(exception.what())));
+    }
+
+    return String::New(escaped.c_str());
 }
 
 Handle<Value> Drizzle::Query(const Arguments& args) {
