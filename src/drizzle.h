@@ -74,7 +74,7 @@ class Drizzle : public node::EventEmitter {
         Local<Object> row(drizzle::Result* result, std::string** currentRow, bool cast) const;
 
     private:
-        std::string parseQuery(const drizzle::Connection* connection, const std::string& query, Local<Array> values) const throw(drizzle::Exception&);
+        std::string parseQuery(const std::string& query, Local<Array> values) const throw(drizzle::Exception&);
 
         // Parsing code borrowed from https://github.com/Sannis/node-mysql-libmysqlclient
         uint64_t parseDate(const std::string& value, bool hasTime) const throw(drizzle::Exception&);

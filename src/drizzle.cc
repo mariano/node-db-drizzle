@@ -288,7 +288,7 @@ Handle<Value> Drizzle::Query(const Arguments& args) {
     }
 
     try {
-        request->query = drizzle->parseQuery(drizzle->connection, request->query, values);
+        request->query = drizzle->parseQuery(request->query, values);
     } catch(drizzle::Exception& exception) {
         return ThrowException(Exception::Error(String::New(exception.what())));
     }
@@ -658,7 +658,7 @@ Local<Object> Drizzle::row(drizzle::Result* result, std::string** currentRow, bo
     return row;
 }
 
-std::string Drizzle::parseQuery(const drizzle::Connection* connection, const std::string& query, Local<Array> values) const throw(drizzle::Exception&) {
+std::string Drizzle::parseQuery(const std::string& query, Local<Array> values) const throw(drizzle::Exception&) {
     std::string parsed(query);
     std::vector<std::string::size_type> positions;
     char quote = 0;
@@ -701,7 +701,7 @@ std::string Drizzle::parseQuery(const drizzle::Connection* connection, const std
         } else if (currentValue->IsString()) {
             String::Utf8Value currentString(currentValue->ToString());
             std::string string = *currentString;
-            currentStream << '\'' <<  connection->escape(string) << '\'';
+            currentStream << '\'' <<  this->connection->escape(string) << '\'';
         }
 
         std::string value = currentStream.str();
