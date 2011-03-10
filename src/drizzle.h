@@ -51,13 +51,14 @@ class Drizzle : public node::EventEmitter {
             v8::Persistent<v8::Function> cbError;
             v8::Persistent<v8::Function> cbEach;
         };
-        drizzle::Connection *connection;
+        drizzle::Connection connection;
 
         Drizzle();
         ~Drizzle();
         static v8::Handle<v8::Value> New(const v8::Arguments& args);
         static v8::Handle<v8::Value> Connect(const v8::Arguments& args);
         static v8::Handle<v8::Value> Disconnect(const v8::Arguments& args);
+        static v8::Handle<v8::Value> IsConnected(const v8::Arguments& args);
         static v8::Handle<v8::Value> Escape(const v8::Arguments& args);
         static v8::Handle<v8::Value> Query(const v8::Arguments& args);
         static int eioConnect(eio_req* req);

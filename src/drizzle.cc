@@ -22,20 +22,17 @@ void node_drizzle::Drizzle::Init(v8::Handle<v8::Object> target) {
 
     NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "connect", Connect);
     NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "disconnect", Disconnect);
+    NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "isConnected", IsConnected);
     NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "escape", Escape);
     NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "query", Query);
 
     target->Set(v8::String::NewSymbol("Drizzle"), functionTemplate->GetFunction());
 }
 
-node_drizzle::Drizzle::Drizzle(): node::EventEmitter(),
-    connection(NULL) {
+node_drizzle::Drizzle::Drizzle(): node::EventEmitter() {
 }
 
 node_drizzle::Drizzle::~Drizzle() {
-    if (this->connection != NULL) {
-        delete this->connection;
-    }
 }
 
 v8::Handle<v8::Value> node_drizzle::Drizzle::New(const v8::Arguments& args) {
@@ -67,30 +64,29 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::Connect(const v8::Arguments& args) 
     node_drizzle::Drizzle *drizzle = node::ObjectWrap::Unwrap<node_drizzle::Drizzle>(args.This());
     assert(drizzle);
 
-    if (drizzle->connection != NULL) {
-        delete drizzle->connection;
-    }
-
     v8::String::Utf8Value hostname(options->Get(hostname_key)->ToString());
     v8::String::Utf8Value user(options->Get(user_key)->ToString());
     v8::String::Utf8Value password(options->Get(password_key)->ToString());
     v8::String::Utf8Value database(options->Get(database_key)->ToString());
 
-    drizzle->connection = new drizzle::Connection();
-    drizzle->connection->setHostname(*hostname);
-    drizzle->connection->setUser(*user);
-    drizzle->connection->setPassword(*password);
-    drizzle->connection->setDatabase(*database);
+    drizzle->connection.setHostname(*hostname);
+    drizzle->connection.setUser(*user);
+    drizzle->connection.setPassword(*password);
+    drizzle->connection.setDatabase(*database);
 
     if (options->Has(port_key)) {
-        drizzle->connection->setPort(options->Get(mysql_key)->ToInt32()->Value());
+        drizzle->connection.setPort(options->Get(mysql_key)->ToInt32()->Value());
     }
 
     if (options->Has(mysql_key)) {
-        drizzle->connection->setMysql(options->Get(mysql_key)->IsTrue());
+        drizzle->connection.setMysql(options->Get(mysql_key)->IsTrue());
     }
 
     connect_request_t *request = new connect_request_t();
+    if (request == NULL) {
+        return v8::ThrowException(v8::Exception::Error(v8::String::New("Could not create EIO request")));
+    }
+
     request->drizzle = drizzle;
     request->error = NULL;
 
@@ -117,23 +113,23 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::Connect(const v8::Arguments& args) 
 
 void node_drizzle::Drizzle::connect(connect_request_t* request) {
     try {
-        request->drizzle->connection->open();
+        request->drizzle->connection.open();
     } catch(const drizzle::Exception& exception) {
         request->error = exception.what();
     }
 }
 
 void node_drizzle::Drizzle::connectFinished(connect_request_t* request) {
-    bool connected = request->drizzle->connection->isOpened();
+    bool connected = request->drizzle->connection.isOpened();
 
     v8::TryCatch tryCatch;
 
     if (connected && !request->cbSuccess.IsEmpty()) {
         v8::Local<v8::Object> server = v8::Object::New();
-        server->Set(v8::String::New("version"), v8::String::New(request->drizzle->connection->version().c_str()));
-        server->Set(v8::String::New("hostname"), v8::String::New(request->drizzle->connection->getHostname().c_str()));
-        server->Set(v8::String::New("user"), v8::String::New(request->drizzle->connection->getUser().c_str()));
-        server->Set(v8::String::New("database"), v8::String::New(request->drizzle->connection->getDatabase().c_str()));
+        server->Set(v8::String::New("version"), v8::String::New(request->drizzle->connection.version().c_str()));
+        server->Set(v8::String::New("hostname"), v8::String::New(request->drizzle->connection.getHostname().c_str()));
+        server->Set(v8::String::New("user"), v8::String::New(request->drizzle->connection.getUser().c_str()));
+        server->Set(v8::String::New("database"), v8::String::New(request->drizzle->connection.getDatabase().c_str()));
 
         v8::Local<v8::Value> argv[1];
         argv[0] = server;
@@ -184,12 +180,18 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::Disconnect(const v8::Arguments& arg
     node_drizzle::Drizzle *drizzle = node::ObjectWrap::Unwrap<node_drizzle::Drizzle>(args.This());
     assert(drizzle);
 
-    if (drizzle->connection != NULL) {
-        drizzle->connection->close();
-        delete drizzle->connection;
-    }
+    drizzle->connection.close();
 
     return v8::Undefined();
+}
+
+v8::Handle<v8::Value> node_drizzle::Drizzle::IsConnected(const v8::Arguments& args) {
+    v8::HandleScope scope;
+
+    node_drizzle::Drizzle *drizzle = node::ObjectWrap::Unwrap<node_drizzle::Drizzle>(args.This());
+    assert(drizzle);
+
+    return scope.Close(drizzle->connection.isOpened() ? v8::True() : v8::False());
 }
 
 v8::Handle<v8::Value> node_drizzle::Drizzle::Escape(const v8::Arguments& args) {
@@ -205,12 +207,12 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::Escape(const v8::Arguments& args) {
     try {
         v8::String::Utf8Value string(args[0]->ToString());
         std::string unescaped(*string);
-        escaped = drizzle->connection->escape(unescaped);
+        escaped = drizzle->connection.escape(unescaped);
     } catch(const drizzle::Exception& exception) {
         return v8::ThrowException(v8::Exception::Error(v8::String::New(exception.what())));
     }
 
-    return v8::String::New(escaped.c_str());
+    return scope.Close(v8::String::New(escaped.c_str()));
 }
 
 v8::Handle<v8::Value> node_drizzle::Drizzle::Query(const v8::Arguments& args) {
@@ -241,6 +243,10 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::Query(const v8::Arguments& args) {
     assert(drizzle);
 
     query_request_t *request = new query_request_t();
+    if (request == NULL) {
+        return v8::ThrowException(v8::Exception::Error(v8::String::New("Could not create EIO request")));
+    }
+
     request->drizzle = drizzle;
     request->cast = true;
     request->buffer = true;
@@ -324,9 +330,8 @@ int node_drizzle::Drizzle::eioQuery(eio_req* eioRequest) {
     assert(request);
 
     try {
-        request->result = request->drizzle->connection->query(request->query);
-
-        if (request->buffer) {
+        request->result = request->drizzle->connection.query(request->query);
+        if (request->buffer && request->result != NULL) {
             request->rows = new std::vector<std::string**>();
             if (request->rows == NULL) {
                 throw drizzle::Exception("Could not create buffer for rows");
@@ -727,7 +732,7 @@ std::string node_drizzle::Drizzle::value(v8::Local<v8::Value> value, bool inArra
     } else if (value->IsString()) {
         v8::String::Utf8Value currentString(value->ToString());
         std::string string = *currentString;
-        currentStream << '\'' <<  this->connection->escape(string) << '\'';
+        currentStream << '\'' <<  this->connection.escape(string) << '\'';
     }
 
     return currentStream.str();

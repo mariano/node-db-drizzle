@@ -1,3 +1,5 @@
+/* Escape & Query building tests */
+
 require("./drizzle");
 
 var assert = require("assert");
@@ -136,7 +138,6 @@ drizzle.query("INSERT INTO users(username,name,age,created,approved) VALUES ?",
         }
     }
 );
-
 
 drizzle.query("INSERT INTO users(username,name,age,created,approved) VALUES ?", 
     [ [
