@@ -19,16 +19,6 @@ void node_drizzle::Query::Init(v8::Handle<v8::Object> target) {
 
     target->Set(v8::String::NewSymbol("Query"), constructorTemplate->GetFunction());
 
-    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_STRING);
-    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_BOOL);
-    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_INT);
-    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_NUMBER);
-    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_DATE);
-    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_TIME);
-    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_DATETIME);
-    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_TEXT);
-    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_SET);
-
     sySuccess = NODE_PERSISTENT_SYMBOL("success");
     syError = NODE_PERSISTENT_SYMBOL("error");
     syEach = NODE_PERSISTENT_SYMBOL("each");
@@ -182,39 +172,9 @@ int node_drizzle::Query::eioExecuteFinished(eio_req* eioRequest) {
             drizzle::Result::Column *currentColumn = request->result->column(j);
             v8::Local<v8::Value> columnType;
 
-            switch (currentColumn->getType()) {
-                case drizzle::Result::Column::BOOL:
-                    columnType = NODE_CONSTANT(COLUMN_TYPE_BOOL);
-                    break;
-                case drizzle::Result::Column::INT:
-                    columnType = NODE_CONSTANT(COLUMN_TYPE_INT);
-                    break;
-                case drizzle::Result::Column::NUMBER:
-                    columnType = NODE_CONSTANT(COLUMN_TYPE_NUMBER);
-                    break;
-                case drizzle::Result::Column::DATE:
-                    columnType = NODE_CONSTANT(COLUMN_TYPE_DATE);
-                    break;
-                case drizzle::Result::Column::TIME:
-                    columnType = NODE_CONSTANT(COLUMN_TYPE_TIME);
-                    break;
-                case drizzle::Result::Column::DATETIME:
-                    columnType = NODE_CONSTANT(COLUMN_TYPE_DATETIME);
-                    break;
-                case drizzle::Result::Column::TEXT:
-                    columnType = NODE_CONSTANT(COLUMN_TYPE_TEXT);
-                    break;
-                case drizzle::Result::Column::SET:
-                    columnType = NODE_CONSTANT(COLUMN_TYPE_SET);
-                    break;
-                default:
-                    columnType = NODE_CONSTANT(COLUMN_TYPE_STRING);
-                    break;
-            }
-
             v8::Local<v8::Object> column = v8::Object::New();
             column->Set(v8::String::New("name"), v8::String::New(currentColumn->getName().c_str()));
-            column->Set(v8::String::New("type"), columnType);
+            column->Set(v8::String::New("type"), NODE_CONSTANT(currentColumn->getType()));
 
             columns->Set(j, column);
         }

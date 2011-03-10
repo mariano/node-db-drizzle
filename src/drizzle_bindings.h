@@ -17,6 +17,11 @@ do {                                                                      \
                                   __callback##_TEM);                      \
 } while (0)
 
+#define NODE_ADD_CONSTANT(target, name, constant)                         \
+  (target)->Set(v8::String::NewSymbol(#name),                             \
+                v8::Integer::New(constant),                               \
+                static_cast<v8::PropertyAttribute>(v8::ReadOnly|v8::DontDelete))
+
 #define ARG_CHECK_OPTIONAL_STRING(I, VAR) \
     if (args.Length() > I && !args[I]->IsString()) { \
         return v8::ThrowException(v8::Exception::Error(v8::String::New("Argument \"" #VAR "\" must be a valid string"))); \

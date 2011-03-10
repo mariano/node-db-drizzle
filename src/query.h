@@ -14,8 +14,6 @@
 #include "./drizzle/result.h"
 #include "./drizzle_bindings.h"
 
-#include <iostream>
-
 namespace node_drizzle {
 class Query : public node::EventEmitter {
     public:
@@ -26,17 +24,6 @@ class Query : public node::EventEmitter {
         v8::Handle<v8::Value> set(const v8::Arguments& args);
 
     protected:
-        typedef enum {
-            COLUMN_TYPE_STRING,
-            COLUMN_TYPE_BOOL,
-            COLUMN_TYPE_INT,
-            COLUMN_TYPE_NUMBER,
-            COLUMN_TYPE_DATE,
-            COLUMN_TYPE_TIME,
-            COLUMN_TYPE_DATETIME,
-            COLUMN_TYPE_TEXT,
-            COLUMN_TYPE_SET
-        } column_type_t;
         struct execute_request_t {
             Query* query;
             drizzle::Result *result;
