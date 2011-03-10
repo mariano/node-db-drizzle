@@ -20,16 +20,14 @@ In *Arch*:
 
 #### Download and build ####
 
-##### Arch Linux: Fix reference to Python #####
-
-If you are on *Arch* you know that the default python binary points to
+If you are on *Arch Linux* you know that the default python binary points to
 Python 3. Unfortunately, Drizzle's pre_hook.sh and pandora-plugin files need 
 python 2. So change the references to python:
 
     $ sed -i 's/python/python2/g' config/pre_hook.sh
     $ sed -i 's/python/python2/g' config/pandora-plugin
 
-#### Download and build libdrizzle ####
+To download and build:
 
     $ bzr branch lp:drizzle
     $ cd drizzle/
