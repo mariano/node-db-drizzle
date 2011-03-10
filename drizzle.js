@@ -10,4 +10,4 @@
  * @ignore
  */
 var node_drizzle = require("./drizzle_bindings");
-exports.Drizzle = node_drizzle.Drizzle;
+Drizzle = node_drizzle.Drizzle;
