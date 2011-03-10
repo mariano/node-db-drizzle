@@ -2,24 +2,30 @@
 #ifndef SRC_DRIZZLE_H_
 #define SRC_DRIZZLE_H_
 
-#include <stdlib.h>
+//#include <stdlib.h>
 #include <node.h>
-#include <node_buffer.h>
+//#include <node_buffer.h>
 #include <node_events.h>
 #include <string>
-#include <sstream>
-#include <vector>
+//#include <sstream>
+//#include <vector>
 #include "./drizzle/connection.h"
 #include "./drizzle/exception.h"
-#include "./drizzle/result.h"
+//#include "./drizzle/result.h"
 #include "./drizzle_bindings.h"
+#include "./query.h"
+
+#include <iostream>
 
 namespace node_drizzle {
 class Drizzle : public node::EventEmitter {
     public:
+        drizzle::Connection connection;
+
         static void Init(v8::Handle<v8::Object> target);
 
     protected:
+        /*
         typedef enum {
             COLUMN_TYPE_STRING,
             COLUMN_TYPE_BOOL,
@@ -31,10 +37,12 @@ class Drizzle : public node::EventEmitter {
             COLUMN_TYPE_TEXT,
             COLUMN_TYPE_SET
         } column_type_t;
+        */
         struct connect_request_t {
             Drizzle* drizzle;
             const char* error;
         };
+        /*
         struct query_request_t {
             bool cast;
             bool buffer;
@@ -49,7 +57,7 @@ class Drizzle : public node::EventEmitter {
             v8::Persistent<v8::Function> cbError;
             v8::Persistent<v8::Function> cbEach;
         };
-        drizzle::Connection connection;
+        */
         static v8::Persistent<v8::String> syReady;
         static v8::Persistent<v8::String> syError;
 
@@ -65,6 +73,7 @@ class Drizzle : public node::EventEmitter {
         static void connect(connect_request_t* request);
         static void connectFinished(connect_request_t* request);
         static int eioConnectFinished(eio_req* eioRequest);
+        /*
         static int eioQuery(eio_req* eioRequest);
         static int eioQueryFinished(eio_req* eioRequest);
         static int eioQueryEach(eio_req* eioRequest);
@@ -74,14 +83,17 @@ class Drizzle : public node::EventEmitter {
         v8::Local<v8::Object> row(drizzle::Result* result, std::string** currentRow, bool cast) const;
         std::string parseQuery(const std::string& query, v8::Local<v8::Array> values) const throw(drizzle::Exception&);
         std::string value(v8::Local<v8::Value> value, bool inArray = false) const throw(drizzle::Exception&);
+        */
         v8::Handle<v8::Value> set(const v8::Arguments& args);
 
+    /*
     private:
         uint64_t toDate(const std::string& value, bool hasTime) const throw(drizzle::Exception&);
         std::string fromDate(const uint64_t timeStamp) const throw(drizzle::Exception&);
         uint64_t toTime(const std::string& value) const;
         // GMT delta calculation borrowed from https://github.com/Sannis/node-mysql-libmysqlclient
         int gmtDelta() const throw(drizzle::Exception&);
+    */
 };
 }
 

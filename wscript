@@ -40,7 +40,7 @@ def configure(conf):
 def build(bld):
   obj = bld.new_task_gen("cxx", "shlib", "node_addon")
   obj.target = "drizzle_bindings"
-  obj.source = "./src/drizzle/connection.cc src/drizzle/exception.cc src/drizzle/result.cc ./src/drizzle.cc ./src/drizzle_bindings.cc"
+  obj.source = "./src/drizzle/connection.cc src/drizzle/exception.cc src/drizzle/result.cc ./src/drizzle.cc ./src/drizzle_bindings.cc ./src/query.cc"
   obj.uselib = "DRIZZLE"
 
 def test(tst):
@@ -105,6 +105,8 @@ def doc(doc):
                      './src/drizzle.cc ' +
                      './src/drizzle_bindings.h ' +
                      './src/drizzle_bindings.cc ' +
+                     './src/query.h' +
+                     './src/query.cc' +
                      './drizzle.js ' +
                      '> ./doc/api.html')
 

@@ -1,389 +1,137 @@
 // Copyright 2011 Mariano Iglesias <mgiglesias@gmail.com>
-#include "./drizzle.h"
+#include "./query.h"
 
-v8::Persistent<v8::String> node_drizzle::Drizzle::syReady;
-v8::Persistent<v8::String> node_drizzle::Drizzle::syError;
+v8::Persistent<v8::FunctionTemplate> node_drizzle::Query::constructorTemplate;
+v8::Persistent<v8::String> node_drizzle::Query::sySuccess;
+v8::Persistent<v8::String> node_drizzle::Query::syError;
+v8::Persistent<v8::String> node_drizzle::Query::syEach;
 
-void node_drizzle::Drizzle::Init(v8::Handle<v8::Object> target) {
+void node_drizzle::Query::Init(v8::Handle<v8::Object> target) {
     v8::HandleScope scope;
 
-    v8::Local<v8::FunctionTemplate> functionTemplate = v8::FunctionTemplate::New(New);
-    functionTemplate->Inherit(node::EventEmitter::constructor_template);
+    v8::Local<v8::FunctionTemplate> t = v8::FunctionTemplate::New(New);
 
-    v8::Local<v8::ObjectTemplate> instanceTemplate = functionTemplate->InstanceTemplate();
-    instanceTemplate->SetInternalFieldCount(1);
+    constructorTemplate = v8::Persistent<v8::FunctionTemplate>::New(t);
+    constructorTemplate->Inherit(node::EventEmitter::constructor_template);
+    constructorTemplate->InstanceTemplate()->SetInternalFieldCount(1);
 
-    /*
-    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_STRING);
-    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_BOOL);
-    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_INT);
-    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_NUMBER);
-    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_DATE);
-    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_TIME);
-    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_DATETIME);
-    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_TEXT);
-    NODE_DEFINE_CONSTANT(instanceTemplate, COLUMN_TYPE_SET);
-    */
+    NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "execute", Execute);
 
-    NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "connect", Connect);
-    NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "disconnect", Disconnect);
-    NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "isConnected", IsConnected);
-    NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "escape", Escape);
-    NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "query", Query);
+    target->Set(v8::String::NewSymbol("Query"), constructorTemplate->GetFunction());
 
-    syReady = NODE_PERSISTENT_SYMBOL("ready");
+    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_STRING);
+    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_BOOL);
+    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_INT);
+    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_NUMBER);
+    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_DATE);
+    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_TIME);
+    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_DATETIME);
+    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_TEXT);
+    NODE_DEFINE_CONSTANT(target, COLUMN_TYPE_SET);
+
+    sySuccess = NODE_PERSISTENT_SYMBOL("success");
     syError = NODE_PERSISTENT_SYMBOL("error");
-
-    target->Set(v8::String::NewSymbol("Drizzle"), functionTemplate->GetFunction());
+    syEach = NODE_PERSISTENT_SYMBOL("each");
 }
 
-node_drizzle::Drizzle::Drizzle(): node::EventEmitter() {
+node_drizzle::Query::Query(): node::EventEmitter(),
+    connection(NULL), cast(true), buffer(true) {
 }
 
-node_drizzle::Drizzle::~Drizzle() {
+node_drizzle::Query::~Query() {
+    this->values.Dispose();
+    this->cbStart.Dispose();
+    this->cbFinish.Dispose();
 }
 
-v8::Handle<v8::Value> node_drizzle::Drizzle::New(const v8::Arguments& args) {
+v8::Handle<v8::Value> node_drizzle::Query::New(const v8::Arguments& args) {
     v8::HandleScope scope;
 
-    node_drizzle::Drizzle *drizzle = new node_drizzle::Drizzle();
-    if (drizzle == NULL) {
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Can't create client object")));
+    node_drizzle::Query *query = new node_drizzle::Query();
+    if (query == NULL) {
+        return v8::ThrowException(v8::Exception::Error(v8::String::New("Can't create query object")));
     }
 
     if (args.Length() > 0) {
-        v8::Handle<v8::Value> set = drizzle->set(args);
+        v8::Handle<v8::Value> set = query->set(args);
         if (!set.IsEmpty()) {
             return set;
         }
     }
 
-    drizzle->Wrap(args.This());
+    query->Wrap(args.This());
 
     return args.This();
 }
 
-v8::Handle<v8::Value> node_drizzle::Drizzle::Connect(const v8::Arguments& args) {
+void node_drizzle::Query::setConnection(drizzle::Connection* connection) {
+    this->connection = connection;
+}
+
+v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
     v8::HandleScope scope;
 
-    node_drizzle::Drizzle *drizzle = node::ObjectWrap::Unwrap<node_drizzle::Drizzle>(args.This());
-    assert(drizzle);
-
-    bool async = true;
+    node_drizzle::Query *query = node::ObjectWrap::Unwrap<node_drizzle::Query>(args.This());
+    assert(query);
 
     if (args.Length() > 0) {
-        v8::Handle<v8::Value> set = drizzle->set(args);
+        v8::Handle<v8::Value> set = query->set(args);
         if (!set.IsEmpty()) {
             return set;
         }
-
-        v8::Local<v8::Object> options = args[0]->ToObject();
-
-        ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, async);
-
-        if (options->Has(async_key) && options->Get(async_key)->IsFalse()) {
-            async = false;
-        }
     }
-
-    connect_request_t *request = new connect_request_t();
-    if (request == NULL) {
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Could not create EIO request")));
-    }
-
-    request->drizzle = drizzle;
-    request->error = NULL;
-
-    if (async) {
-        request->drizzle->Ref();
-        eio_custom(eioConnect, EIO_PRI_DEFAULT, eioConnectFinished, request);
-        ev_ref(EV_DEFAULT_UC);
-    } else {
-        connect(request);
-        connectFinished(request);
-    }
-
-    return v8::Undefined();
-}
-
-v8::Handle<v8::Value> node_drizzle::Drizzle::set(const v8::Arguments& args) {
-    ARG_CHECK_OBJECT(0, options);
-
-    v8::Local<v8::Object> options = args[0]->ToObject();
-
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_STRING(options, hostname);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_STRING(options, user);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_STRING(options, password);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_STRING(options, database);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_UINT32(options, port);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, mysql);
-
-    v8::String::Utf8Value hostname(options->Get(hostname_key)->ToString());
-    v8::String::Utf8Value user(options->Get(user_key)->ToString());
-    v8::String::Utf8Value password(options->Get(password_key)->ToString());
-    v8::String::Utf8Value database(options->Get(database_key)->ToString());
-
-    if (options->Has(hostname_key)) {
-        this->connection.setHostname(*hostname);
-    }
-
-    if (options->Has(user_key)) {
-        this->connection.setUser(*user);
-    }
-
-    if (options->Has(password_key)) {
-        this->connection.setPassword(*password);
-    }
-
-    if (options->Has(database_key)) {
-        this->connection.setDatabase(*database);
-    }
-
-    if (options->Has(port_key)) {
-        this->connection.setPort(options->Get(mysql_key)->ToInt32()->Value());
-    }
-
-    if (options->Has(mysql_key)) {
-        this->connection.setMysql(options->Get(mysql_key)->IsTrue());
-    }
-
-    return v8::Handle<v8::Value>();
-}
-
-void node_drizzle::Drizzle::connect(connect_request_t* request) {
-    try {
-        request->drizzle->connection.open();
-    } catch(const drizzle::Exception& exception) {
-        request->error = exception.what();
-    }
-}
-
-void node_drizzle::Drizzle::connectFinished(connect_request_t* request) {
-    bool connected = request->drizzle->connection.isOpened();
-
-    if (connected) {
-        v8::Local<v8::Object> server = v8::Object::New();
-        server->Set(v8::String::New("version"), v8::String::New(request->drizzle->connection.version().c_str()));
-        server->Set(v8::String::New("hostname"), v8::String::New(request->drizzle->connection.getHostname().c_str()));
-        server->Set(v8::String::New("user"), v8::String::New(request->drizzle->connection.getUser().c_str()));
-        server->Set(v8::String::New("database"), v8::String::New(request->drizzle->connection.getDatabase().c_str()));
-
-        v8::Local<v8::Value> argv[1];
-        argv[0] = server;
-
-        request->drizzle->Emit(syReady, 1, argv);
-    } else {
-        v8::Local<v8::Value> argv[1];
-        argv[0] = v8::String::New(request->error != NULL ? request->error : "(unknown error)");
-
-        request->drizzle->Emit(syError, 1, argv);
-    }
-
-    delete request;
-}
-
-int node_drizzle::Drizzle::eioConnect(eio_req* eioRequest) {
-    connect_request_t *request = static_cast<connect_request_t *>(eioRequest->data);
-    assert(request);
-
-    connect(request);
-
-    return 0;
-}
-
-int node_drizzle::Drizzle::eioConnectFinished(eio_req* eioRequest) {
-    v8::HandleScope scope;
-
-    connect_request_t *request = static_cast<connect_request_t *>(eioRequest->data);
-    assert(request);
-
-    ev_unref(EV_DEFAULT_UC);
-    request->drizzle->Unref();
-
-    connectFinished(request);
-
-    return 0;
-}
-
-v8::Handle<v8::Value> node_drizzle::Drizzle::Disconnect(const v8::Arguments& args) {
-    v8::HandleScope scope;
-
-    node_drizzle::Drizzle *drizzle = node::ObjectWrap::Unwrap<node_drizzle::Drizzle>(args.This());
-    assert(drizzle);
-
-    drizzle->connection.close();
-
-    return v8::Undefined();
-}
-
-v8::Handle<v8::Value> node_drizzle::Drizzle::IsConnected(const v8::Arguments& args) {
-    v8::HandleScope scope;
-
-    node_drizzle::Drizzle *drizzle = node::ObjectWrap::Unwrap<node_drizzle::Drizzle>(args.This());
-    assert(drizzle);
-
-    return scope.Close(drizzle->connection.isOpened() ? v8::True() : v8::False());
-}
-
-v8::Handle<v8::Value> node_drizzle::Drizzle::Escape(const v8::Arguments& args) {
-    v8::HandleScope scope;
-
-    ARG_CHECK_STRING(0, string);
-
-    node_drizzle::Drizzle *drizzle = node::ObjectWrap::Unwrap<node_drizzle::Drizzle>(args.This());
-    assert(drizzle);
-
-    std::string escaped;
 
     try {
-        v8::String::Utf8Value string(args[0]->ToString());
-        std::string unescaped(*string);
-        escaped = drizzle->connection.escape(unescaped);
+        query->sql = query->parseQuery(query->sql, query->values);
     } catch(const drizzle::Exception& exception) {
         return v8::ThrowException(v8::Exception::Error(v8::String::New(exception.what())));
     }
 
-    return scope.Close(v8::String::New(escaped.c_str()));
-}
-
-v8::Handle<v8::Value> node_drizzle::Drizzle::Query(const v8::Arguments& args) {
-    v8::HandleScope scope;
-
-    node_drizzle::Drizzle *drizzle = node::ObjectWrap::Unwrap<node_drizzle::Drizzle>(args.This());
-    assert(drizzle);
-
-    v8::Persistent<v8::Object> query(
-        node_drizzle::Query::constructorTemplate->GetFunction()->NewInstance());
-
-    node_drizzle::Query *queryInstance = node::ObjectWrap::Unwrap<node_drizzle::Query>(query);
-    queryInstance->setConnection(&drizzle->connection);
-
-    v8::Handle<v8::Value> set = queryInstance->set(args);
-    if (!set.IsEmpty()) {
-        return set;
-    }
-
-    return scope.Close(query);
-}
-
-/*
-v8::Handle<v8::Value> node_drizzle::Drizzle::Query(const v8::Arguments& args) {
-    v8::HandleScope scope;
-
-    ARG_CHECK_STRING(0, query);
-
-    if (args.Length() > 2) {
-        ARG_CHECK_ARRAY(1, values);
-        ARG_CHECK_OBJECT(2, options);
-    } else {
-        ARG_CHECK_OBJECT(1, options);
-    }
-
-    v8::Local<v8::Object> options = args[args.Length() > 2 ? 2 : 1]->ToObject();
-
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, buffer);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, cast);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, start);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, finish);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, success);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, error);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, each);
-
-    v8::String::Utf8Value query(args[0]->ToString());
-
-    node_drizzle::Drizzle *drizzle = node::ObjectWrap::Unwrap<node_drizzle::Drizzle>(args.This());
-    assert(drizzle);
-
-    query_request_t *request = new query_request_t();
-    if (request == NULL) {
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Could not create EIO request")));
-    }
-
-    request->drizzle = drizzle;
-    request->cast = true;
-    request->buffer = true;
-    request->query = *query;
-    request->result = NULL;
-    request->rows = NULL;
-    request->error = NULL;
-
-    if (options->Has(buffer_key)) {
-        request->buffer = options->Get(buffer_key)->IsTrue();
-    }
-
-    if (options->Has(cast_key)) {
-        request->cast = options->Get(cast_key)->IsTrue();
-    }
-
-    if (options->Has(start_key)) {
-        request->cbStart = v8::Persistent<v8::Function>::New(v8::Local<v8::Function>::Cast(options->Get(start_key)));
-    }
-
-    if (options->Has(finish_key)) {
-        request->cbFinish = v8::Persistent<v8::Function>::New(v8::Local<v8::Function>::Cast(options->Get(finish_key)));
-    }
-
-    if (options->Has(success_key)) {
-        request->cbSuccess = v8::Persistent<v8::Function>::New(v8::Local<v8::Function>::Cast(options->Get(success_key)));
-    }
-
-    if (options->Has(error_key)) {
-        request->cbError = v8::Persistent<v8::Function>::New(v8::Local<v8::Function>::Cast(options->Get(error_key)));
-    }
-
-    if (options->Has(each_key)) {
-        request->cbEach = v8::Persistent<v8::Function>::New(v8::Local<v8::Function>::Cast(options->Get(each_key)));
-    }
-
-    v8::Local<v8::Array> values;
-
-    if (args.Length() > 2) {
-        values = v8::Array::Cast(*args[1]);
-    } else {
-        values = v8::Array::New();
-    }
-
-    try {
-        request->query = drizzle->parseQuery(request->query, values);
-    } catch(const drizzle::Exception& exception) {
-        return v8::ThrowException(v8::Exception::Error(v8::String::New(exception.what())));
-    }
-
-    if (!request->cbStart.IsEmpty()) {
+    if (!query->cbStart.IsEmpty()) {
         v8::Local<v8::Value> argv[1];
-        argv[0] = v8::String::New(request->query.c_str());
+        argv[0] = v8::String::New(query->sql.c_str());
 
         v8::TryCatch tryCatch;
-        v8::Handle<v8::Value> result = request->cbStart->Call(v8::Context::GetCurrent()->Global(), 1, argv);
+        v8::Handle<v8::Value> result = query->cbStart->Call(v8::Context::GetCurrent()->Global(), 1, argv);
         if (tryCatch.HasCaught()) {
             node::FatalException(tryCatch);
         }
 
         if (!result->IsUndefined()) {
             if (result->IsFalse()) {
-                eioQueryRequestFree(request);
                 return v8::Undefined();
             } else if (result->IsString()) {
                 v8::String::Utf8Value modifiedQuery(result->ToString());
-                request->query = *modifiedQuery;
+                query->sql = *modifiedQuery;
             }
         }
     }
 
-    request->drizzle->Ref();
-    eio_custom(eioQuery, EIO_PRI_DEFAULT, eioQueryFinished, request);
+    execute_request_t *request = new execute_request_t();
+    if (request == NULL) {
+        return v8::ThrowException(v8::Exception::Error(v8::String::New("Could not create EIO request")));
+    }
+
+    request->query = query;
+    request->result = NULL;
+    request->rows = NULL;
+    request->error = NULL;
+
+    request->query->Ref();
+    eio_custom(eioExecute, EIO_PRI_DEFAULT, eioExecuteFinished, request);
     ev_ref(EV_DEFAULT_UC);
 
     return v8::Undefined();
 }
 
-int node_drizzle::Drizzle::eioQuery(eio_req* eioRequest) {
-    query_request_t *request = static_cast<query_request_t *>(eioRequest->data);
+int node_drizzle::Query::eioExecute(eio_req* eioRequest) {
+    execute_request_t *request = static_cast<execute_request_t *>(eioRequest->data);
     assert(request);
+    assert(request->query->connection);
 
     try {
-        request->result = request->drizzle->connection.query(request->query);
-        if (request->buffer && request->result != NULL) {
+        request->result = request->query->connection->query(request->query->sql);
+        if (request->query->buffer && request->result != NULL) {
             request->rows = new std::vector<std::string**>();
             if (request->rows == NULL) {
                 throw drizzle::Exception("Could not create buffer for rows");
@@ -418,16 +166,14 @@ int node_drizzle::Drizzle::eioQuery(eio_req* eioRequest) {
     return 0;
 }
 
-int node_drizzle::Drizzle::eioQueryFinished(eio_req* eioRequest) {
+int node_drizzle::Query::eioExecuteFinished(eio_req* eioRequest) {
     v8::HandleScope scope;
 
-    query_request_t *request = static_cast<query_request_t *>(eioRequest->data);
+    execute_request_t *request = static_cast<execute_request_t *>(eioRequest->data);
     assert(request);
 
     uint16_t columnCount = (request->result != NULL ? request->result->columnCount() : 0);
-    if (request->error == NULL) {
-        assert(request->result);
-
+    if (request->error == NULL && request->result != NULL) {
         v8::Local<v8::Value> argv[2];
         uint8_t argc = 1;
 
@@ -477,28 +223,22 @@ int node_drizzle::Drizzle::eioQueryFinished(eio_req* eioRequest) {
 
         v8::Local<v8::Array> rows = v8::Array::New();
 
-        if (request->buffer) {
+        if (request->query->buffer) {
             assert(request->rows);
 
             uint64_t index = 0;
             for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator, index++) {
                 std::string** row = *iterator;
-                rows->Set(index, request->drizzle->row(request->result, row, request->cast));
+                rows->Set(index, request->query->row(request->result, row, request->query->cast));
             }
 
             argc = 2;
             argv[1] = rows;
         }
 
-        if (!request->cbSuccess.IsEmpty()) {
-            v8::TryCatch tryCatch;
-            request->cbSuccess->Call(v8::Context::GetCurrent()->Global(), argc, argv);
-            if (tryCatch.HasCaught()) {
-                node::FatalException(tryCatch);
-            }
-        }
+        request->query->Emit(sySuccess, argc, argv);
 
-        if (request->buffer && !request->cbEach.IsEmpty()) {
+        if (request->query->buffer) {
             uint64_t index = 0;
             for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator, index++) {
                 v8::Local<v8::Value> eachArgv[3];
@@ -507,31 +247,23 @@ int node_drizzle::Drizzle::eioQueryFinished(eio_req* eioRequest) {
                 eachArgv[1] = v8::Number::New(index);
                 eachArgv[2] = v8::Local<v8::Value>::New(iterator == end ? v8::True() : v8::False());
 
-                v8::TryCatch tryCatch;
-                request->cbEach->Call(v8::Context::GetCurrent()->Global(), 3, eachArgv);
-                if (tryCatch.HasCaught()) {
-                    node::FatalException(tryCatch);
-                }
+                request->query->Emit(syEach, 3, eachArgv);
             }
         }
-    } else if (!request->cbError.IsEmpty()) {
+    } else {
         v8::Local<v8::Value> argv[1];
         argv[0] = v8::String::New(request->error != NULL ? request->error : "(unknown error)");
 
-        v8::TryCatch tryCatch;
-        request->cbError->Call(v8::Context::GetCurrent()->Global(), 1, argv);
-        if (tryCatch.HasCaught()) {
-            node::FatalException(tryCatch);
-        }
+        request->query->Emit(syError, 1, argv);
     }
 
-    eioQueryCleanup(request);
+    eioExecuteCleanup(request);
 
     return 0;
 }
 
-int node_drizzle::Drizzle::eioQueryEach(eio_req* eioRequest) {
-    query_request_t *request = static_cast<query_request_t *>(eioRequest->data);
+int node_drizzle::Query::eioExecuteEach(eio_req* eioRequest) {
+    execute_request_t *request = static_cast<execute_request_t *>(eioRequest->data);
     assert(request);
 
     try {
@@ -568,53 +300,47 @@ int node_drizzle::Drizzle::eioQueryEach(eio_req* eioRequest) {
     return 0;
 }
 
-int node_drizzle::Drizzle::eioQueryEachFinished(eio_req* eioRequest) {
+int node_drizzle::Query::eioExecuteEachFinished(eio_req* eioRequest) {
     v8::HandleScope scope;
 
-    query_request_t *request = static_cast<query_request_t *>(eioRequest->data);
+    execute_request_t *request = static_cast<execute_request_t *>(eioRequest->data);
     assert(request);
 
-    if (!request->cbEach.IsEmpty() && request->rows != NULL) {
-        v8::Local<v8::Value> eachArgv[3];
+    v8::Local<v8::Value> eachArgv[3];
 
-        eachArgv[0] = request->drizzle->row(request->result, request->rows->front(), request->cast);
-        eachArgv[1] = v8::Number::New(request->result->index());
-        eachArgv[2] = v8::Local<v8::Value>::New(request->result->hasNext() ? v8::False() : v8::True());
+    eachArgv[0] = request->query->row(request->result, request->rows->front(), request->query->cast);
+    eachArgv[1] = v8::Number::New(request->result->index());
+    eachArgv[2] = v8::Local<v8::Value>::New(request->result->hasNext() ? v8::False() : v8::True());
 
-        v8::TryCatch tryCatch;
-        request->cbEach->Call(v8::Context::GetCurrent()->Global(), 3, eachArgv);
-        if (tryCatch.HasCaught()) {
-            node::FatalException(tryCatch);
-        }
-    }
+    request->query->Emit(syEach, 3, eachArgv);
 
-    eioQueryCleanup(request);
+    eioExecuteCleanup(request);
 
     return 0;
 }
 
-void node_drizzle::Drizzle::eioQueryCleanup(query_request_t* request) {
+void node_drizzle::Query::eioExecuteCleanup(execute_request_t* request) {
     ev_unref(EV_DEFAULT_UC);
-    request->drizzle->Unref();
+    request->query->Unref();
 
     if (request->result == NULL || !request->result->hasNext()) {
-        if (!request->cbFinish.IsEmpty()) {
+        if (!request->query->cbFinish.IsEmpty()) {
             v8::TryCatch tryCatch;
-            request->cbFinish->Call(v8::Context::GetCurrent()->Global(), 0, NULL);
+            request->query->cbFinish->Call(v8::Context::GetCurrent()->Global(), 0, NULL);
             if (tryCatch.HasCaught()) {
                 node::FatalException(tryCatch);
             }
         }
 
-        eioQueryRequestFree(request);
+        eioExecuteRequestFree(request);
     } else {
-        request->drizzle->Ref();
-        eio_custom(eioQueryEach, EIO_PRI_DEFAULT, eioQueryEachFinished, request);
+        request->query->Ref();
+        eio_custom(eioExecuteEach, EIO_PRI_DEFAULT, eioExecuteEachFinished, request);
         ev_ref(EV_DEFAULT_UC);
     }
 }
 
-void node_drizzle::Drizzle::eioQueryRequestFree(query_request_t* request) {
+void node_drizzle::Query::eioExecuteRequestFree(execute_request_t* request) {
     if (request->result != NULL) {
         if (request->rows != NULL) {
             uint16_t columnCount = request->result->columnCount();
@@ -634,16 +360,85 @@ void node_drizzle::Drizzle::eioQueryRequestFree(query_request_t* request) {
         delete request->result;
     }
 
-    request->cbStart.Dispose();
-    request->cbFinish.Dispose();
-    request->cbSuccess.Dispose();
-    request->cbError.Dispose();
-    request->cbEach.Dispose();
-
     delete request;
 }
 
-v8::Local<v8::Object> node_drizzle::Drizzle::row(drizzle::Result* result, std::string** currentRow, bool cast) const {
+v8::Handle<v8::Value> node_drizzle::Query::set(const v8::Arguments& args) {
+    if (args.Length() == 0) {
+        return v8::Handle<v8::Value>();
+    }
+
+    int queryIndex = -1, optionsIndex = -1, valuesIndex = -1;
+
+    if (args.Length() > 2) {
+        ARG_CHECK_STRING(0, query);
+        ARG_CHECK_ARRAY(1, values);
+        ARG_CHECK_OBJECT(2, options);
+        queryIndex = 0;
+        valuesIndex = 1;
+        optionsIndex = 2;
+    } else if (args.Length() > 1) {
+        ARG_CHECK_STRING(0, query);
+        queryIndex = 0;
+        if (args[1]->IsArray()) {
+            ARG_CHECK_ARRAY(1, values);
+            valuesIndex = 1;
+        } else {
+            ARG_CHECK_OBJECT(1, options);
+            optionsIndex = 1;
+        }
+    } else if (args[0]->IsString()) {
+        ARG_CHECK_STRING(0, query);
+        queryIndex = 0;
+    } else if (args[0]->IsArray()) {
+        ARG_CHECK_ARRAY(0, values);
+        valuesIndex = 0;
+    } else {
+        ARG_CHECK_OBJECT(0, options);
+        optionsIndex = 0;
+    }
+
+    if (queryIndex >= 0) {
+        v8::String::Utf8Value sql(args[queryIndex]->ToString());
+        this->sql = *sql;
+    }
+
+    if (optionsIndex >= 0) {
+        v8::Local<v8::Object> options = args[optionsIndex]->ToObject();
+
+        ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, buffer);
+        ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, cast);
+        ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, start);
+        ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, finish);
+        ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, success);
+        ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, error);
+        ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, each);
+
+        if (options->Has(buffer_key)) {
+            this->buffer = options->Get(buffer_key)->IsTrue();
+        }
+
+        if (options->Has(cast_key)) {
+            this->cast = options->Get(cast_key)->IsTrue();
+        }
+
+        if (options->Has(start_key)) {
+            this->cbStart = v8::Persistent<v8::Function>::New(v8::Local<v8::Function>::Cast(options->Get(start_key)));
+        }
+
+        if (options->Has(finish_key)) {
+            this->cbFinish = v8::Persistent<v8::Function>::New(v8::Local<v8::Function>::Cast(options->Get(finish_key)));
+        }
+    }
+
+    if (valuesIndex >= 0) {
+        this->values = v8::Array::Cast(*args[valuesIndex]);
+    }
+
+    return v8::Handle<v8::Value>();
+}
+
+v8::Local<v8::Object> node_drizzle::Query::row(drizzle::Result* result, std::string** currentRow, bool cast) const {
     v8::Local<v8::Object> row = v8::Object::New();
 
     for (uint16_t j = 0, limitj = result->columnCount(); j < limitj; j++) {
@@ -713,7 +508,7 @@ v8::Local<v8::Object> node_drizzle::Drizzle::row(drizzle::Result* result, std::s
     return row;
 }
 
-std::string node_drizzle::Drizzle::parseQuery(const std::string& query, v8::Local<v8::Array> values) const throw(drizzle::Exception&) {
+std::string node_drizzle::Query::parseQuery(const std::string& query, v8::Persistent<v8::Array> values) const throw(drizzle::Exception&) {
     std::string parsed(query);
     std::vector<std::string::size_type> positions;
     char quote = 0;
@@ -739,7 +534,8 @@ std::string node_drizzle::Drizzle::parseQuery(const std::string& query, v8::Loca
         }
     }
 
-    if (positions.size() != values->Length()) {
+    uint32_t valuesLength = !values.IsEmpty() ? values->Length() : 0;
+    if (positions.size() != valuesLength) {
         throw drizzle::Exception("Wrong number of values to escape");
     }
 
@@ -754,7 +550,7 @@ std::string node_drizzle::Drizzle::parseQuery(const std::string& query, v8::Loca
     return parsed;
 }
 
-std::string node_drizzle::Drizzle::value(v8::Local<v8::Value> value, bool inArray) const throw(drizzle::Exception&) {
+std::string node_drizzle::Query::value(v8::Local<v8::Value> value, bool inArray) const throw(drizzle::Exception&) {
     std::ostringstream currentStream;
 
     if (value->IsArray()) {
@@ -784,13 +580,13 @@ std::string node_drizzle::Drizzle::value(v8::Local<v8::Value> value, bool inArra
     } else if (value->IsString()) {
         v8::String::Utf8Value currentString(value->ToString());
         std::string string = *currentString;
-        currentStream << '\'' <<  this->connection.escape(string) << '\'';
+        currentStream << '\'' <<  this->connection->escape(string) << '\'';
     }
 
     return currentStream.str();
 }
 
-uint64_t node_drizzle::Drizzle::toDate(const std::string& value, bool hasTime) const throw(drizzle::Exception&) {
+uint64_t node_drizzle::Query::toDate(const std::string& value, bool hasTime) const throw(drizzle::Exception&) {
     int day, month, year, hour, min, sec;
     char sep;
     std::istringstream stream(value, std::istringstream::in);
@@ -820,7 +616,7 @@ uint64_t node_drizzle::Drizzle::toDate(const std::string& value, bool hasTime) c
     return static_cast<uint64_t>((mktime(&timeinfo) + this->gmtDelta()) * 1000);
 }
 
-std::string node_drizzle::Drizzle::fromDate(const uint64_t timeStamp) const throw(drizzle::Exception&) {
+std::string node_drizzle::Query::fromDate(const uint64_t timeStamp) const throw(drizzle::Exception&) {
     char* buffer = new char[20];
     if (buffer == NULL) {
         throw drizzle::Exception("Can\'t create buffer to write parsed date");
@@ -841,7 +637,7 @@ std::string node_drizzle::Drizzle::fromDate(const uint64_t timeStamp) const thro
     return date;
 }
 
-int node_drizzle::Drizzle::gmtDelta() const throw(drizzle::Exception&) {
+int node_drizzle::Query::gmtDelta() const throw(drizzle::Exception&) {
     int localHour, gmtHour, localMin, gmtMin;
     time_t rawtime;
     struct tm timeinfo;
@@ -869,7 +665,7 @@ int node_drizzle::Drizzle::gmtDelta() const throw(drizzle::Exception&) {
     return gmtDelta;
 }
 
-uint64_t node_drizzle::Drizzle::toTime(const std::string& value) const {
+uint64_t node_drizzle::Query::toTime(const std::string& value) const {
     int hour, min, sec;
     char sep;
     std::istringstream stream(value, std::istringstream::in);
@@ -890,4 +686,4 @@ uint64_t node_drizzle::Drizzle::toTime(const std::string& value) const {
 
     return static_cast<uint64_t>((mktime(&timeinfo) + this->gmtDelta()) * 1000);
 }
-*/
+
