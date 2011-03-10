@@ -1,7 +1,7 @@
 { "name" : "drizzle"
 , "description" : "Drizzle/MySQL bindings for Node.JS"
 , "homepage" : "http://github.com/mariano/node-drizzle"
-, "version" : "0.1.4"
+, "version" : "0.2.0"
 , "engines" : { "node" : ">=0.4.1" }
 , "maintainers" :
   [ { "name": "Mariano Iglesias"
