@@ -34,8 +34,6 @@ class Drizzle : public node::EventEmitter {
         struct connect_request_t {
             Drizzle* drizzle;
             const char* error;
-            v8::Persistent<v8::Function> cbSuccess;
-            v8::Persistent<v8::Function> cbError;
         };
         struct query_request_t {
             bool cast;
@@ -52,6 +50,8 @@ class Drizzle : public node::EventEmitter {
             v8::Persistent<v8::Function> cbEach;
         };
         drizzle::Connection connection;
+        static v8::Persistent<v8::String> sySuccess;
+        static v8::Persistent<v8::String> syError;
 
         Drizzle();
         ~Drizzle();
@@ -74,6 +74,7 @@ class Drizzle : public node::EventEmitter {
         v8::Local<v8::Object> row(drizzle::Result* result, std::string** currentRow, bool cast) const;
         std::string parseQuery(const std::string& query, v8::Local<v8::Array> values) const throw(drizzle::Exception&);
         std::string value(v8::Local<v8::Value> value, bool inArray = false) const throw(drizzle::Exception&);
+        v8::Handle<v8::Value> set(const v8::Arguments& args);
 
     private:
         uint64_t toDate(const std::string& value, bool hasTime) const throw(drizzle::Exception&);

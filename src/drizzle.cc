@@ -1,6 +1,9 @@
 // Copyright 2011 Mariano Iglesias <mgiglesias@gmail.com>
 #include "./drizzle.h"
 
+v8::Persistent<v8::String> node_drizzle::Drizzle::sySuccess;
+v8::Persistent<v8::String> node_drizzle::Drizzle::syError;
+
 void node_drizzle::Drizzle::Init(v8::Handle<v8::Object> target) {
     v8::HandleScope scope;
 
@@ -26,6 +29,9 @@ void node_drizzle::Drizzle::Init(v8::Handle<v8::Object> target) {
     NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "escape", Escape);
     NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "query", Query);
 
+    sySuccess = NODE_PERSISTENT_SYMBOL("success");
+    syError = NODE_PERSISTENT_SYMBOL("error");
+
     target->Set(v8::String::NewSymbol("Drizzle"), functionTemplate->GetFunction());
 }
 
@@ -39,6 +45,17 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::New(const v8::Arguments& args) {
     v8::HandleScope scope;
 
     node_drizzle::Drizzle *drizzle = new node_drizzle::Drizzle();
+    if (drizzle == NULL) {
+        return v8::ThrowException(v8::Exception::Error(v8::String::New("Can't create client object")));
+    }
+
+    if (args.Length() > 0) {
+        v8::Handle<v8::Value> set = drizzle->set(args);
+        if (!set->IsUndefined()) {
+            return set;
+        }
+    }
+
     drizzle->Wrap(args.This());
 
     return args.This();
@@ -47,39 +64,24 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::New(const v8::Arguments& args) {
 v8::Handle<v8::Value> node_drizzle::Drizzle::Connect(const v8::Arguments& args) {
     v8::HandleScope scope;
 
-    ARG_CHECK_OBJECT(0, options);
-
-    v8::Local<v8::Object> options = args[0]->ToObject();
-
-    ARG_CHECK_OBJECT_ATTR_STRING(options, hostname);
-    ARG_CHECK_OBJECT_ATTR_STRING(options, user);
-    ARG_CHECK_OBJECT_ATTR_STRING(options, password);
-    ARG_CHECK_OBJECT_ATTR_STRING(options, database);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_UINT32(options, port);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, mysql);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, success);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, error);
-    ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, async);
-
     node_drizzle::Drizzle *drizzle = node::ObjectWrap::Unwrap<node_drizzle::Drizzle>(args.This());
     assert(drizzle);
 
-    v8::String::Utf8Value hostname(options->Get(hostname_key)->ToString());
-    v8::String::Utf8Value user(options->Get(user_key)->ToString());
-    v8::String::Utf8Value password(options->Get(password_key)->ToString());
-    v8::String::Utf8Value database(options->Get(database_key)->ToString());
+    bool async = true;
 
-    drizzle->connection.setHostname(*hostname);
-    drizzle->connection.setUser(*user);
-    drizzle->connection.setPassword(*password);
-    drizzle->connection.setDatabase(*database);
+    if (args.Length() > 0) {
+        v8::Handle<v8::Value> set = drizzle->set(args);
+        if (!set->IsUndefined()) {
+            return set;
+        }
 
-    if (options->Has(port_key)) {
-        drizzle->connection.setPort(options->Get(mysql_key)->ToInt32()->Value());
-    }
+        v8::Local<v8::Object> options = args[0]->ToObject();
 
-    if (options->Has(mysql_key)) {
-        drizzle->connection.setMysql(options->Get(mysql_key)->IsTrue());
+        ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, async);
+
+        if (options->Has(async_key) && options->Get(async_key)->IsFalse()) {
+            async = false;
+        }
     }
 
     connect_request_t *request = new connect_request_t();
@@ -90,15 +92,6 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::Connect(const v8::Arguments& args) 
     request->drizzle = drizzle;
     request->error = NULL;
 
-    if (options->Has(success_key)) {
-        request->cbSuccess = v8::Persistent<v8::Function>::New(v8::Local<v8::Function>::Cast(options->Get(success_key)));
-    }
-
-    if (options->Has(error_key)) {
-        request->cbError = v8::Persistent<v8::Function>::New(v8::Local<v8::Function>::Cast(options->Get(error_key)));
-    }
-
-    bool async = options->Has(async_key) ? options->Get(async_key)->IsTrue() : true;
     if (async) {
         request->drizzle->Ref();
         eio_custom(eioConnect, EIO_PRI_DEFAULT, eioConnectFinished, request);
@@ -106,6 +99,50 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::Connect(const v8::Arguments& args) 
     } else {
         connect(request);
         connectFinished(request);
+    }
+
+    return v8::Undefined();
+}
+
+v8::Handle<v8::Value> node_drizzle::Drizzle::set(const v8::Arguments& args) {
+    ARG_CHECK_OBJECT(0, options);
+
+    v8::Local<v8::Object> options = args[0]->ToObject();
+
+    ARG_CHECK_OBJECT_ATTR_OPTIONAL_STRING(options, hostname);
+    ARG_CHECK_OBJECT_ATTR_OPTIONAL_STRING(options, user);
+    ARG_CHECK_OBJECT_ATTR_OPTIONAL_STRING(options, password);
+    ARG_CHECK_OBJECT_ATTR_OPTIONAL_STRING(options, database);
+    ARG_CHECK_OBJECT_ATTR_OPTIONAL_UINT32(options, port);
+    ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, mysql);
+
+    v8::String::Utf8Value hostname(options->Get(hostname_key)->ToString());
+    v8::String::Utf8Value user(options->Get(user_key)->ToString());
+    v8::String::Utf8Value password(options->Get(password_key)->ToString());
+    v8::String::Utf8Value database(options->Get(database_key)->ToString());
+
+    if (options->Has(hostname_key)) {
+        this->connection.setHostname(*hostname);
+    }
+
+    if (options->Has(user_key)) {
+        this->connection.setUser(*user);
+    }
+
+    if (options->Has(password_key)) {
+        this->connection.setPassword(*password);
+    }
+
+    if (options->Has(database_key)) {
+        this->connection.setDatabase(*database);
+    }
+
+    if (options->Has(port_key)) {
+        this->connection.setPort(options->Get(mysql_key)->ToInt32()->Value());
+    }
+
+    if (options->Has(mysql_key)) {
+        this->connection.setMysql(options->Get(mysql_key)->IsTrue());
     }
 
     return v8::Undefined();
@@ -122,9 +159,7 @@ void node_drizzle::Drizzle::connect(connect_request_t* request) {
 void node_drizzle::Drizzle::connectFinished(connect_request_t* request) {
     bool connected = request->drizzle->connection.isOpened();
 
-    v8::TryCatch tryCatch;
-
-    if (connected && !request->cbSuccess.IsEmpty()) {
+    if (connected) {
         v8::Local<v8::Object> server = v8::Object::New();
         server->Set(v8::String::New("version"), v8::String::New(request->drizzle->connection.version().c_str()));
         server->Set(v8::String::New("hostname"), v8::String::New(request->drizzle->connection.getHostname().c_str()));
@@ -134,19 +169,13 @@ void node_drizzle::Drizzle::connectFinished(connect_request_t* request) {
         v8::Local<v8::Value> argv[1];
         argv[0] = server;
 
-        request->cbSuccess->Call(v8::Context::GetCurrent()->Global(), 1, argv);
-    } else if (!connected && !request->cbError.IsEmpty()) {
+        request->drizzle->Emit(sySuccess, 1, argv);
+    } else {
         v8::Local<v8::Value> argv[1];
         argv[0] = v8::String::New(request->error != NULL ? request->error : "(unknown error)");
-        request->cbError->Call(v8::Context::GetCurrent()->Global(), 1, argv);
-    }
 
-    if (tryCatch.HasCaught()) {
-        node::FatalException(tryCatch);
+        request->drizzle->Emit(syError, 1, argv);
     }
-
-    request->cbSuccess.Dispose();
-    request->cbError.Dispose();
 
     delete request;
 }
