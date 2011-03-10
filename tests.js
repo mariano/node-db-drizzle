@@ -18,21 +18,21 @@ drizzle.query("SELECT * FROM users", {
 
 assert.throws(
     function () {
-        drizzle.query("SELECT * FROM users WHERE id = ?");
-    },
-    /Argument .+ mandatory/
-);
-
-assert.throws(
-    function () {
-        drizzle.query("SELECT * FROM users WHERE id = ?", {});
+        drizzle.query("SELECT * FROM users WHERE id = ?").execute();
     },
     /Wrong number of values/
 );
 
 assert.throws(
     function () {
-        drizzle.query("SELECT * FROM users WHERE id = ?", [], {});
+        drizzle.query("SELECT * FROM users WHERE id = ?", {}).execute();
+    },
+    /Wrong number of values/
+);
+
+assert.throws(
+    function () {
+        drizzle.query("SELECT * FROM users WHERE id = ?", [], {}).execute();
     },
     /Wrong number of values/
 );
