@@ -51,7 +51,7 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::New(const v8::Arguments& args) {
 
     if (args.Length() > 0) {
         v8::Handle<v8::Value> set = drizzle->set(args);
-        if (!set->IsUndefined()) {
+        if (!set.IsEmpty()) {
             return set;
         }
     }
@@ -71,7 +71,7 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::Connect(const v8::Arguments& args) 
 
     if (args.Length() > 0) {
         v8::Handle<v8::Value> set = drizzle->set(args);
-        if (!set->IsUndefined()) {
+        if (!set.IsEmpty()) {
             return set;
         }
 
@@ -145,7 +145,7 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::set(const v8::Arguments& args) {
         this->connection.setMysql(options->Get(mysql_key)->IsTrue());
     }
 
-    return v8::Undefined();
+    return v8::Handle<v8::Value>();
 }
 
 void node_drizzle::Drizzle::connect(connect_request_t* request) {
