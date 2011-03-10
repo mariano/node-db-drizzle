@@ -1,7 +1,7 @@
 // Copyright 2011 Mariano Iglesias <mgiglesias@gmail.com>
 #include "./drizzle.h"
 
-v8::Persistent<v8::String> node_drizzle::Drizzle::sySuccess;
+v8::Persistent<v8::String> node_drizzle::Drizzle::syReady;
 v8::Persistent<v8::String> node_drizzle::Drizzle::syError;
 
 void node_drizzle::Drizzle::Init(v8::Handle<v8::Object> target) {
@@ -29,7 +29,7 @@ void node_drizzle::Drizzle::Init(v8::Handle<v8::Object> target) {
     NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "escape", Escape);
     NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "query", Query);
 
-    sySuccess = NODE_PERSISTENT_SYMBOL("success");
+    syReady = NODE_PERSISTENT_SYMBOL("ready");
     syError = NODE_PERSISTENT_SYMBOL("error");
 
     target->Set(v8::String::NewSymbol("Drizzle"), functionTemplate->GetFunction());
@@ -169,7 +169,7 @@ void node_drizzle::Drizzle::connectFinished(connect_request_t* request) {
         v8::Local<v8::Value> argv[1];
         argv[0] = server;
 
-        request->drizzle->Emit(sySuccess, 1, argv);
+        request->drizzle->Emit(syReady, 1, argv);
     } else {
         v8::Local<v8::Value> argv[1];
         argv[0] = v8::String::New(request->error != NULL ? request->error : "(unknown error)");

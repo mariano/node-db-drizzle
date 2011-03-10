@@ -50,7 +50,7 @@ class Drizzle : public node::EventEmitter {
             v8::Persistent<v8::Function> cbEach;
         };
         drizzle::Connection connection;
-        static v8::Persistent<v8::String> sySuccess;
+        static v8::Persistent<v8::String> syReady;
         static v8::Persistent<v8::String> syError;
 
         Drizzle();
