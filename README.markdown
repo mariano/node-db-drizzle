@@ -36,4 +36,16 @@ To download and build:
     $ make libdrizzle
     $ sudo make install-libdrizzle
 
+### Install node-drizzle ###
+
+#### Using npm ####
+
+    $ npm install drizzle
+
+#### Using GIT ####
+
+    $ git clone https://github.com/mariano/node-drizzle.git
+    $ cd node-drizzle
+    $ node-waf configure build
+
 [license]: http://www.opensource.org/licenses/mit-license.php
