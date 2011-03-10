@@ -110,14 +110,3 @@ def doc(doc):
 
 def gh_pages(context):
   Utils.exec_command('./gh_pages.sh')
-
-def shutdown():
-  # HACK to get bindings.node out of build directory.
-  # better way to do this?
-  t = 'drizzle_bindings.node'
-  if Options.commands['clean']:
-    if exists(t): unlink(t)
-  else:
-    if exists('build/default/' + t) and not exists(t):
-      symlink('build/default/' + t, t)
-

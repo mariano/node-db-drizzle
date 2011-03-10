@@ -1,7 +1,7 @@
-var assert = require("assert");
-var node_drizzle = require("./drizzle_bindings");
+require("./drizzle");
 
-var drizzle = new node_drizzle.Drizzle();
+var assert = require("assert");
+var drizzle = new Drizzle();
 
 assert.equal("test", drizzle.escape("test"));
 assert.equal("test \\\"string\\\"", drizzle.escape("test \"string\""));
