@@ -64,7 +64,6 @@ class Query : public node::EventEmitter {
         uint64_t toTime(const std::string& value) const;
         // GMT delta calculation borrowed from https://github.com/Sannis/node-mysql-libmysqlclient
         int gmtDelta() const throw(drizzle::Exception&);
-
 };
 }
 
