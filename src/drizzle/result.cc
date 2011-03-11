@@ -72,7 +72,6 @@ drizzle::Result::Result(drizzle_st* drizzle, drizzle_result_st* result) throw(dr
     }
 
     if (drizzle_column_buffer(this->result) != DRIZZLE_RETURN_OK) {
-        drizzle_result_free(this->result);
         throw drizzle::Exception("Could not buffer columns");
     }
 
@@ -80,7 +79,6 @@ drizzle::Result::Result(drizzle_st* drizzle, drizzle_result_st* result) throw(dr
     if (this->totalColumns > 0) {
         this->columns = new Column*[this->totalColumns];
         if (this->columns == NULL) {
-            drizzle_result_free(this->result);
             throw drizzle::Exception("Could not allocate storage for columns");
         }
 
@@ -108,7 +106,6 @@ drizzle::Result::~Result() {
         if (this->nextRow != NULL) {
             drizzle_row_free(this->result, this->nextRow);
         }
-        drizzle_result_free(this->result);
     }
 }
 
