@@ -33,7 +33,6 @@ class Query : public node::EventEmitter {
         drizzle::Connection* connection;
         std::string sql;
         bool cast;
-        bool buffer;
         v8::Persistent<v8::Array> values;
         v8::Persistent<v8::Function>* cbStart;
         v8::Persistent<v8::Function>* cbFinish;
@@ -47,10 +46,6 @@ class Query : public node::EventEmitter {
         static v8::Handle<v8::Value> Execute(const v8::Arguments& args);
         static int eioExecute(eio_req* eioRequest);
         static int eioExecuteFinished(eio_req* eioRequest);
-        static int eioExecuteEach(eio_req* eioRequest);
-        static int eioExecuteEachFinished(eio_req* eioRequest);
-        static void eioExecuteCleanup(execute_request_t* request);
-        static void eioExecuteRequestFree(execute_request_t* request);
         v8::Local<v8::Object> row(drizzle::Result* result, std::string** currentRow, bool cast) const;
         std::string parseQuery(const std::string& query, v8::Persistent<v8::Array> values) const throw(drizzle::Exception&);
         std::string value(v8::Local<v8::Value> value, bool inArray = false) const throw(drizzle::Exception&);

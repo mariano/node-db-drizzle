@@ -25,7 +25,7 @@ void node_drizzle::Query::Init(v8::Handle<v8::Object> target) {
 }
 
 node_drizzle::Query::Query(): node::EventEmitter(),
-    connection(NULL), cast(true), buffer(true), cbStart(NULL), cbFinish(NULL) {
+    connection(NULL), cast(true), cbStart(NULL), cbFinish(NULL) {
 }
 
 node_drizzle::Query::~Query() {
@@ -125,7 +125,7 @@ int node_drizzle::Query::eioExecute(eio_req* eioRequest) {
 
     try {
         request->result = request->query->connection->query(request->query->sql);
-        if (request->query->buffer && request->result != NULL) {
+        if (request->result != NULL) {
             request->rows = new std::vector<std::string**>();
             if (request->rows == NULL) {
                 throw drizzle::Exception("Could not create buffer for rows");
@@ -168,6 +168,8 @@ int node_drizzle::Query::eioExecuteFinished(eio_req* eioRequest) {
 
     uint16_t columnCount = (request->result != NULL ? request->result->columnCount() : 0);
     if (request->error == NULL && request->result != NULL) {
+        assert(request->rows);
+
         v8::Local<v8::Value> argv[2];
         uint8_t argc = 1;
 
@@ -187,32 +189,28 @@ int node_drizzle::Query::eioExecuteFinished(eio_req* eioRequest) {
 
         v8::Local<v8::Array> rows = v8::Array::New();
 
-        if (request->query->buffer) {
-            assert(request->rows);
+        uint64_t index = 0;
+        for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator, index++) {
+            std::string** currentRow = *iterator;
+            v8::Local<v8::Object> row = request->query->row(request->result, currentRow, request->query->cast);
 
-            uint64_t index = 0;
-            for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator, index++) {
-                std::string** row = *iterator;
-                rows->Set(index, request->query->row(request->result, row, request->query->cast));
-            }
+            v8::Local<v8::Value> eachArgv[3];
 
-            argc = 2;
-            argv[1] = rows;
+            eachArgv[0] = row;
+            eachArgv[1] = v8::Number::New(index);
+            eachArgv[2] = v8::Local<v8::Value>::New(iterator == end ? v8::True() : v8::False());
+
+            request->query->Emit(syEach, 3, eachArgv);
+
+            rows->Set(index, row);
         }
+
+        argc = 2;
+        argv[1] = rows;
 
         request->query->Emit(sySuccess, argc, argv);
 
-        if (request->query->buffer) {
-            uint64_t index = 0;
-            for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator, index++) {
-                v8::Local<v8::Value> eachArgv[3];
-
-                eachArgv[0] = rows->Get(index);
-                eachArgv[1] = v8::Number::New(index);
-                eachArgv[2] = v8::Local<v8::Value>::New(iterator == end ? v8::True() : v8::False());
-
-                request->query->Emit(syEach, 3, eachArgv);
-            }
+        for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator, index++) {
         }
     } else {
         v8::Local<v8::Value> argv[1];
@@ -221,90 +219,17 @@ int node_drizzle::Query::eioExecuteFinished(eio_req* eioRequest) {
         request->query->Emit(syError, 1, argv);
     }
 
-    eioExecuteCleanup(request);
-
-    return 0;
-}
-
-int node_drizzle::Query::eioExecuteEach(eio_req* eioRequest) {
-    execute_request_t *request = static_cast<execute_request_t *>(eioRequest->data);
-    assert(request);
-
-    try {
-        if (request->result->hasNext()) {
-            const char **currentRow = request->result->next();
-            request->rows = new std::vector<std::string**>();
-            if (request->rows == NULL) {
-                throw drizzle::Exception("Could not create buffer for rows");
-            }
-
-            uint16_t columnCount = request->result->columnCount();
-            std::string** row = new std::string*[columnCount];
-            if (row == NULL) {
-                throw drizzle::Exception("Could not create buffer for row");
-            }
-
-            for (uint16_t i = 0; i < columnCount; i++) {
-                if (currentRow[i] != NULL) {
-                    row[i] = new std::string(currentRow[i]);
-                } else {
-                    row[i] = NULL;
-                }
-            }
-
-            request->rows->push_back(row);
-        }
-    } catch(const drizzle::Exception& exception) {
-        if (request->rows != NULL) {
-            delete request->rows;
-        }
-        request->error = exception.what();
-    }
-
-    return 0;
-}
-
-int node_drizzle::Query::eioExecuteEachFinished(eio_req* eioRequest) {
-    v8::HandleScope scope;
-
-    execute_request_t *request = static_cast<execute_request_t *>(eioRequest->data);
-    assert(request);
-
-    v8::Local<v8::Value> eachArgv[3];
-
-    eachArgv[0] = request->query->row(request->result, request->rows->front(), request->query->cast);
-    eachArgv[1] = v8::Number::New(request->result->index());
-    eachArgv[2] = v8::Local<v8::Value>::New(request->result->hasNext() ? v8::False() : v8::True());
-
-    request->query->Emit(syEach, 3, eachArgv);
-
-    eioExecuteCleanup(request);
-
-    return 0;
-}
-
-void node_drizzle::Query::eioExecuteCleanup(execute_request_t* request) {
     ev_unref(EV_DEFAULT_UC);
     request->query->Unref();
 
-    if (request->query->buffer || request->result == NULL || !request->result->hasNext()) {
-        if (request->query->cbFinish != NULL && !request->query->cbFinish->IsEmpty()) {
-            v8::TryCatch tryCatch;
-            (*(request->query->cbFinish))->Call(v8::Context::GetCurrent()->Global(), 0, NULL);
-            if (tryCatch.HasCaught()) {
-                node::FatalException(tryCatch);
-            }
+    if (request->query->cbFinish != NULL && !request->query->cbFinish->IsEmpty()) {
+        v8::TryCatch tryCatch;
+        (*(request->query->cbFinish))->Call(v8::Context::GetCurrent()->Global(), 0, NULL);
+        if (tryCatch.HasCaught()) {
+            node::FatalException(tryCatch);
         }
-
-        eioExecuteRequestFree(request);
-    } else {
-        request->query->Ref();
-        eio_custom(eioExecuteEach, EIO_PRI_DEFAULT, eioExecuteEachFinished, request);
-        ev_ref(EV_DEFAULT_UC);
     }
-}
 
-void node_drizzle::Query::eioExecuteRequestFree(execute_request_t* request) {
     if (request->result != NULL) {
         if (request->rows != NULL) {
             uint16_t columnCount = request->result->columnCount();
@@ -325,6 +250,8 @@ void node_drizzle::Query::eioExecuteRequestFree(execute_request_t* request) {
     }
 
     delete request;
+
+    return 0;
 }
 
 v8::Handle<v8::Value> node_drizzle::Query::set(const v8::Arguments& args) {
@@ -370,17 +297,12 @@ v8::Handle<v8::Value> node_drizzle::Query::set(const v8::Arguments& args) {
     if (optionsIndex >= 0) {
         v8::Local<v8::Object> options = args[optionsIndex]->ToObject();
 
-        ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, buffer);
         ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, cast);
         ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, start);
         ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, finish);
         ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, success);
         ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, error);
         ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(options, each);
-
-        if (options->Has(buffer_key)) {
-            this->buffer = options->Get(buffer_key)->IsTrue();
-        }
 
         if (options->Has(cast_key)) {
             this->cast = options->Get(cast_key)->IsTrue();
