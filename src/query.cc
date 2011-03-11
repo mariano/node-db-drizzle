@@ -25,7 +25,7 @@ void node_drizzle::Query::Init(v8::Handle<v8::Object> target) {
 }
 
 node_drizzle::Query::Query(): node::EventEmitter(),
-    connection(NULL), cast(true), buffer(true), cbStart(NULL), cbFinish(NULL) {
+    connection(NULL), cast(true), buffer(false), cbStart(NULL), cbFinish(NULL) {
 }
 
 node_drizzle::Query::~Query() {
