@@ -25,13 +25,16 @@ void node_drizzle::Query::Init(v8::Handle<v8::Object> target) {
 }
 
 node_drizzle::Query::Query(): node::EventEmitter(),
-    connection(NULL), cast(true), cbStart(NULL), cbFinish(NULL) {
+    connection(NULL), cast(true), cbStart(NULL), cbSuccess(NULL), cbFinish(NULL) {
 }
 
 node_drizzle::Query::~Query() {
     this->values.Dispose();
     if (this->cbStart != NULL) {
         node::cb_destroy(this->cbStart);
+    }
+    if (this->cbSuccess != NULL) {
+        node::cb_destroy(this->cbSuccess);
     }
     if (this->cbFinish != NULL) {
         node::cb_destroy(this->cbFinish);
@@ -171,23 +174,6 @@ int node_drizzle::Query::eioExecuteFinished(eio_req* eioRequest) {
     if (request->error == NULL && request->result != NULL) {
         assert(request->rows);
 
-        v8::Local<v8::Value> argv[2];
-        uint8_t argc = 1;
-
-        v8::Local<v8::Array> columns = v8::Array::New(columnCount);
-        for (uint16_t j = 0; j < columnCount; j++) {
-            drizzle::Result::Column *currentColumn = request->result->column(j);
-            v8::Local<v8::Value> columnType;
-
-            v8::Local<v8::Object> column = v8::Object::New();
-            column->Set(v8::String::New("name"), v8::String::New(currentColumn->getName().c_str()));
-            column->Set(v8::String::New("type"), NODE_CONSTANT(currentColumn->getType()));
-
-            columns->Set(j, column);
-        }
-
-        argv[0] = columns;
-
         v8::Local<v8::Array> rows = v8::Array::New();
 
         uint64_t index = 0;
@@ -205,10 +191,31 @@ int node_drizzle::Query::eioExecuteFinished(eio_req* eioRequest) {
             rows->Set(index, row);
         }
 
-        argc = 2;
-        argv[1] = rows;
+        v8::Local<v8::Array> columns = v8::Array::New(columnCount);
+        for (uint16_t j = 0; j < columnCount; j++) {
+            drizzle::Result::Column *currentColumn = request->result->column(j);
+            v8::Local<v8::Value> columnType;
 
-        request->query->Emit(sySuccess, argc, argv);
+            v8::Local<v8::Object> column = v8::Object::New();
+            column->Set(v8::String::New("name"), v8::String::New(currentColumn->getName().c_str()));
+            column->Set(v8::String::New("type"), NODE_CONSTANT(currentColumn->getType()));
+
+            columns->Set(j, column);
+        }
+
+        v8::Local<v8::Value> argv[2];
+        argv[0] = rows;
+        argv[1] = columns;
+
+        request->query->Emit(sySuccess, 2, argv);
+
+        if (request->query->cbSuccess != NULL && !request->query->cbSuccess->IsEmpty()) {
+            v8::TryCatch tryCatch;
+            (*(request->query->cbSuccess))->Call(v8::Context::GetCurrent()->Global(), 2, argv);
+            if (tryCatch.HasCaught()) {
+                node::FatalException(tryCatch);
+            }
+        }
     } else {
         v8::Local<v8::Value> argv[1];
         argv[0] = v8::String::New(request->error != NULL ? request->error : "(unknown error)");
@@ -256,34 +263,64 @@ v8::Handle<v8::Value> node_drizzle::Query::set(const v8::Arguments& args) {
         return v8::Handle<v8::Value>();
     }
 
-    int queryIndex = -1, optionsIndex = -1, valuesIndex = -1;
+    int queryIndex = -1, optionsIndex = -1, valuesIndex = -1, callbackIndex = -1;
 
-    if (args.Length() > 2) {
+    if (args.Length() > 3) {
         ARG_CHECK_STRING(0, query);
         ARG_CHECK_ARRAY(1, values);
-        ARG_CHECK_OBJECT(2, options);
+        ARG_CHECK_FUNCTION(2, callback);
+        ARG_CHECK_OBJECT(3, options);
         queryIndex = 0;
         valuesIndex = 1;
-        optionsIndex = 2;
-    } else if (args.Length() > 1) {
+        callbackIndex = 2;
+        optionsIndex = 3;
+    } else if (args.Length() == 3) {
+        ARG_CHECK_STRING(0, query);
+        if (args[2]->IsFunction()) {
+            ARG_CHECK_FUNCTION(2, callback);
+            if (args[1]->IsArray()) {
+                ARG_CHECK_ARRAY(1, values);
+                valuesIndex = 1;
+            } else {
+                ARG_CHECK_OBJECT(1, options);
+                optionsIndex = 1;
+            }
+            callbackIndex = 2;
+        } else {
+            ARG_CHECK_STRING(0, query);
+            ARG_CHECK_ARRAY(1, values);
+            ARG_CHECK_OBJECT(2, options);
+            queryIndex = 0;
+            valuesIndex = 1;
+            optionsIndex = 2;
+        }
+    } else if (args.Length() == 2) {
         ARG_CHECK_STRING(0, query);
         queryIndex = 0;
-        if (args[1]->IsArray()) {
+        if (args[1]->IsFunction()) {
+            ARG_CHECK_FUNCTION(1, callback);
+            callbackIndex = 1;
+        } else if (args[1]->IsArray()) {
             ARG_CHECK_ARRAY(1, values);
             valuesIndex = 1;
         } else {
             ARG_CHECK_OBJECT(1, options);
             optionsIndex = 1;
         }
-    } else if (args[0]->IsString()) {
-        ARG_CHECK_STRING(0, query);
-        queryIndex = 0;
-    } else if (args[0]->IsArray()) {
-        ARG_CHECK_ARRAY(0, values);
-        valuesIndex = 0;
-    } else {
-        ARG_CHECK_OBJECT(0, options);
-        optionsIndex = 0;
+    } else if (args.Length() == 1) {
+        if (args[0]->IsString()) {
+            ARG_CHECK_STRING(0, query);
+            queryIndex = 0;
+        } else if (args[0]->IsFunction()) {
+            ARG_CHECK_FUNCTION(0, callback);
+            callbackIndex = 0;
+        } else if (args[0]->IsArray()) {
+            ARG_CHECK_ARRAY(0, values);
+            valuesIndex = 0;
+        } else {
+            ARG_CHECK_OBJECT(0, options);
+            optionsIndex = 0;
+        }
     }
 
     if (queryIndex >= 0) {
@@ -322,6 +359,10 @@ v8::Handle<v8::Value> node_drizzle::Query::set(const v8::Arguments& args) {
 
     if (valuesIndex >= 0) {
         this->values = v8::Array::Cast(*args[valuesIndex]);
+    }
+
+    if (callbackIndex >= 0) {
+        this->cbSuccess = node::cb_persist(args[callbackIndex]);
     }
 
     return v8::Handle<v8::Value>();
