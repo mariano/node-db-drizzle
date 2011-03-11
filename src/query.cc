@@ -25,7 +25,7 @@ void node_drizzle::Query::Init(v8::Handle<v8::Object> target) {
 }
 
 node_drizzle::Query::Query(): node::EventEmitter(),
-    connection(NULL), cast(true), buffer(false), cbStart(NULL), cbFinish(NULL) {
+    connection(NULL), cast(true), buffer(true), cbStart(NULL), cbFinish(NULL) {
 }
 
 node_drizzle::Query::~Query() {
@@ -287,7 +287,7 @@ void node_drizzle::Query::eioExecuteCleanup(execute_request_t* request) {
     ev_unref(EV_DEFAULT_UC);
     request->query->Unref();
 
-    if (request->result == NULL || !request->result->hasNext()) {
+    if (request->query->buffer || request->result == NULL || !request->result->hasNext()) {
         if (request->query->cbFinish != NULL && !request->query->cbFinish->IsEmpty()) {
             v8::TryCatch tryCatch;
             (*(request->query->cbFinish))->Call(v8::Context::GetCurrent()->Global(), 0, NULL);
