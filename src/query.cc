@@ -25,13 +25,17 @@ void node_drizzle::Query::Init(v8::Handle<v8::Object> target) {
 }
 
 node_drizzle::Query::Query(): node::EventEmitter(),
-    connection(NULL), cast(true), buffer(true) {
+    connection(NULL), cast(true), buffer(true), cbStart(NULL), cbFinish(NULL) {
 }
 
 node_drizzle::Query::~Query() {
     this->values.Dispose();
-    this->cbStart.Dispose();
-    this->cbFinish.Dispose();
+    if (this->cbStart != NULL) {
+        node::cb_destroy(this->cbStart);
+    }
+    if (this->cbFinish != NULL) {
+        node::cb_destroy(this->cbFinish);
+    }
 }
 
 v8::Handle<v8::Value> node_drizzle::Query::New(const v8::Arguments& args) {
@@ -77,12 +81,12 @@ v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
         return v8::ThrowException(v8::Exception::Error(v8::String::New(exception.what())));
     }
 
-    if (!query->cbStart.IsEmpty()) {
+    if (query->cbStart != NULL && !query->cbStart->IsEmpty()) {
         v8::Local<v8::Value> argv[1];
         argv[0] = v8::String::New(query->sql.c_str());
 
         v8::TryCatch tryCatch;
-        v8::Handle<v8::Value> result = query->cbStart->Call(v8::Context::GetCurrent()->Global(), 1, argv);
+        v8::Handle<v8::Value> result = (*(query->cbStart))->Call(v8::Context::GetCurrent()->Global(), 1, argv);
         if (tryCatch.HasCaught()) {
             node::FatalException(tryCatch);
         }
@@ -284,9 +288,9 @@ void node_drizzle::Query::eioExecuteCleanup(execute_request_t* request) {
     request->query->Unref();
 
     if (request->result == NULL || !request->result->hasNext()) {
-        if (!request->query->cbFinish.IsEmpty()) {
+        if (request->query->cbFinish != NULL && !request->query->cbFinish->IsEmpty()) {
             v8::TryCatch tryCatch;
-            request->query->cbFinish->Call(v8::Context::GetCurrent()->Global(), 0, NULL);
+            (*(request->query->cbFinish))->Call(v8::Context::GetCurrent()->Global(), 0, NULL);
             if (tryCatch.HasCaught()) {
                 node::FatalException(tryCatch);
             }
@@ -383,11 +387,17 @@ v8::Handle<v8::Value> node_drizzle::Query::set(const v8::Arguments& args) {
         }
 
         if (options->Has(start_key)) {
-            this->cbStart = v8::Persistent<v8::Function>::New(v8::Local<v8::Function>::Cast(options->Get(start_key)));
+            if (this->cbStart != NULL) {
+                node::cb_destroy(this->cbStart);
+            }
+            this->cbStart = node::cb_persist(options->Get(start_key));
         }
 
         if (options->Has(finish_key)) {
-            this->cbFinish = v8::Persistent<v8::Function>::New(v8::Local<v8::Function>::Cast(options->Get(finish_key)));
+            if (this->cbFinish != NULL) {
+                node::cb_destroy(this->cbFinish);
+            }
+            this->cbFinish = node::cb_persist(options->Get(finish_key));
         }
     }
 
