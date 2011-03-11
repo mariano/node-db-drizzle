@@ -127,6 +127,7 @@ int node_drizzle::Query::eioExecute(eio_req* eioRequest) {
         request->result = request->query->connection->query(request->query->sql);
         if (request->result != NULL) {
             request->rows = new std::vector<std::string**>();
+
             if (request->rows == NULL) {
                 throw drizzle::Exception("Could not create buffer for rows");
             }
@@ -193,7 +194,6 @@ int node_drizzle::Query::eioExecuteFinished(eio_req* eioRequest) {
         for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator, index++) {
             std::string** currentRow = *iterator;
             v8::Local<v8::Object> row = request->query->row(request->result, currentRow, request->query->cast);
-
             v8::Local<v8::Value> eachArgv[3];
 
             eachArgv[0] = row;
@@ -209,9 +209,6 @@ int node_drizzle::Query::eioExecuteFinished(eio_req* eioRequest) {
         argv[1] = rows;
 
         request->query->Emit(sySuccess, argc, argv);
-
-        for (std::vector<std::string**>::iterator iterator = request->rows->begin(), end = request->rows->end(); iterator != end; ++iterator, index++) {
-        }
     } else {
         v8::Local<v8::Value> argv[1];
         argv[0] = v8::String::New(request->error != NULL ? request->error : "(unknown error)");
