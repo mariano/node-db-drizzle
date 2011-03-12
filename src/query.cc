@@ -6,8 +6,9 @@ v8::Persistent<v8::String> node_drizzle::Query::sySuccess;
 v8::Persistent<v8::String> node_drizzle::Query::syError;
 v8::Persistent<v8::String> node_drizzle::Query::syEach;
 
-char node_drizzle::Query::quoteString = '\'';
-char node_drizzle::Query::quoteField = '`';
+const char node_drizzle::Query::quoteString = '\'';
+const char node_drizzle::Query::quoteField = '`';
+const char node_drizzle::Query::quoteTable = '`';
 
 void node_drizzle::Query::Init(v8::Handle<v8::Object> target) {
     v8::HandleScope scope;
@@ -19,6 +20,7 @@ void node_drizzle::Query::Init(v8::Handle<v8::Object> target) {
     constructorTemplate->InstanceTemplate()->SetInternalFieldCount(1);
 
     NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "select", Select);
+    NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "from", From);
     NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "execute", Execute);
 
     target->Set(v8::String::NewSymbol("Query"), constructorTemplate->GetFunction());
@@ -50,7 +52,7 @@ v8::Handle<v8::Value> node_drizzle::Query::New(const v8::Arguments& args) {
 
     node_drizzle::Query *query = new node_drizzle::Query();
     if (query == NULL) {
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Can't create query object")));
+        THROW_EXCEPTION("Can't create query object")
     }
 
     if (args.Length() > 0) {
@@ -74,14 +76,14 @@ v8::Handle<v8::Value> node_drizzle::Query::Select(const v8::Arguments& args) {
 
     if (args.Length() > 0) {
         if (args[0]->IsArray()) {
-            ARG_CHECK_ARRAY(0, from);
+            ARG_CHECK_ARRAY(0, fields);
         } else if (args[0]->IsObject()) {
-            ARG_CHECK_OBJECT(0, from);
+            ARG_CHECK_OBJECT(0, fields);
         } else {
-            ARG_CHECK_STRING(0, from);
+            ARG_CHECK_STRING(0, fields);
         }
     } else {
-        ARG_CHECK_STRING(0, from);
+        ARG_CHECK_STRING(0, fields);
     }
 
     node_drizzle::Query *query = node::ObjectWrap::Unwrap<node_drizzle::Query>(args.This());
@@ -92,7 +94,7 @@ v8::Handle<v8::Value> node_drizzle::Query::Select(const v8::Arguments& args) {
     if (args[0]->IsArray()) {
         v8::Local<v8::Array> fields = v8::Array::Cast(*args[0]);
         if (fields->Length() == 0) {
-            return v8::ThrowException(v8::Exception::Error(v8::String::New("No fields specified in select")));
+            THROW_EXCEPTION("No fields specified in select")
         }
 
         for (uint32_t i = 0, limiti = fields->Length(); i < limiti; i++) {
@@ -103,18 +105,18 @@ v8::Handle<v8::Value> node_drizzle::Query::Select(const v8::Arguments& args) {
             try {
                 query->sql << query->selectField(fields->Get(i));
             } catch(const drizzle::Exception& exception) {
-                return v8::ThrowException(v8::Exception::Error(v8::String::New(exception.what())));
+                THROW_EXCEPTION(exception.what())
             }
         }
     } else if (args[0]->IsObject()) {
         try {
             query->sql << query->selectField(args[0]);
         } catch(const drizzle::Exception& exception) {
-            return v8::ThrowException(v8::Exception::Error(v8::String::New(exception.what())));
+            THROW_EXCEPTION(exception.what())
         }
     } else {
-        v8::String::Utf8Value from(args[0]->ToString());
-        query->sql << *from;
+        v8::String::Utf8Value fields(args[0]->ToString());
+        query->sql << *fields;
     }
 
     return args.This();
@@ -149,7 +151,7 @@ std::string node_drizzle::Query::selectField(v8::Local<v8::Value> value) const t
                 if (currentObject->Has(escapeKey)) {
                     optionValue = currentObject->Get(escapeKey);
                     if (!optionValue->IsBoolean()) {
-                        throw drizzle::Exception("Specify a valid boolean value for the escape \"option\" in the select field object");
+                        throw drizzle::Exception("Specify a valid boolean value for the \"escape\" option in the select field object");
                     }
                     escape = optionValue->IsTrue();
                 }
@@ -179,6 +181,78 @@ std::string node_drizzle::Query::selectField(v8::Local<v8::Value> value) const t
     return buffer.str();
 }
 
+v8::Handle<v8::Value> node_drizzle::Query::From(const v8::Arguments& args) {
+    v8::HandleScope scope;
+
+    if (args.Length() > 0) {
+        if (args[0]->IsObject()) {
+            ARG_CHECK_OBJECT(0, tables);
+        } else {
+            ARG_CHECK_STRING(0, tables);
+        }
+    } else {
+        ARG_CHECK_STRING(0, tables);
+    }
+
+    ARG_CHECK_OPTIONAL_BOOL(1, escape);
+
+    node_drizzle::Query *query = node::ObjectWrap::Unwrap<node_drizzle::Query>(args.This());
+    assert(query);
+
+    bool escape = true;
+    if (args.Length() > 1) {
+        escape = args[1]->IsTrue();
+    }
+
+    query->sql << "FROM ";
+
+    if (args[0]->IsObject()) {
+        v8::Local<v8::Object> valueObject = args[0]->ToObject();
+        v8::Local<v8::Array> valueProperties = valueObject->GetPropertyNames();
+        if (valueProperties->Length() == 0) {
+            THROW_EXCEPTION("Non empty objects should be used for aliasing in from")
+        }
+
+        v8::Local<v8::Value> propertyName = valueProperties->Get(0);
+        v8::Local<v8::Value> propertyValue = valueObject->Get(propertyName);
+
+        if (!propertyName->IsString() || !propertyValue->IsString()) {
+            THROW_EXCEPTION("Only strings are allowed for table / alias name in from")
+        }
+
+        v8::String::Utf8Value table(propertyValue);
+        v8::String::Utf8Value alias(propertyName);
+
+        if (escape) {
+            query->sql << Query::quoteTable;
+        }
+        query->sql << *table;
+        if (escape) {
+            query->sql << Query::quoteTable;
+        }
+        query->sql << " AS ";
+        if (escape) {
+            query->sql << Query::quoteTable;
+        }
+        query->sql << *alias;
+        if (escape) {
+            query->sql << Query::quoteTable;
+        }
+    } else {
+        v8::String::Utf8Value tables(args[0]->ToString());
+
+        if (escape) {
+            query->sql << Query::quoteTable;
+        }
+        query->sql << *tables;
+        if (escape) {
+            query->sql << Query::quoteTable;
+        }
+    }
+
+    return args.This();
+}
+
 v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
     v8::HandleScope scope;
 
@@ -197,7 +271,7 @@ v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
     try {
         sql = query->parseQuery(sql, query->values);
     } catch(const drizzle::Exception& exception) {
-        return v8::ThrowException(v8::Exception::Error(v8::String::New(exception.what())));
+        THROW_EXCEPTION(exception.what())
     }
 
     if (query->cbStart != NULL && !query->cbStart->IsEmpty()) {
@@ -222,7 +296,7 @@ v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
 
     execute_request_t *request = new execute_request_t();
     if (request == NULL) {
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Could not create EIO request")));
+        THROW_EXCEPTION("Could not create EIO request")
     }
 
     query->sql.str("");

@@ -3,6 +3,27 @@
 require("./drizzle");
 var testCase = require("nodeunit").testCase;
 
+exports["Drizzle"] = testCase({
+    "setUp": function(callback) {
+        this.drizzle = new Drizzle();
+        callback();
+    },
+    "escape()": function(test) {
+        var drizzle = this.drizzle;
+        test.expect(7);
+
+        test.equal("test", drizzle.escape("test"));
+        test.equal("\\\"string\\\" test", drizzle.escape("\"string\" test"));
+        test.equal("\\'string\\' test", drizzle.escape("\'string\' test"));
+        test.equal("test \\\"string\\\"", drizzle.escape("test \"string\""));
+        test.equal("test \\'string\\'", drizzle.escape("test \'string\'"));
+        test.equal("test \\\"string\\\" middle", drizzle.escape("test \"string\" middle"));
+        test.equal("test \\'string\\' middle", drizzle.escape("test \'string\' middle"));
+        
+        test.done();
+    }
+});
+
 exports["Query"] = testCase({
     "setUp": function(callback) {
         this.drizzle = new Drizzle();
@@ -212,12 +233,10 @@ exports["Query"] = testCase({
             "Argument \"from\" is mandatory"
         );
 
-        drizzle.query().select("*").execute({
-            start: function(query) {
-                test.equal("SELECT *", query);
-                return false;
-            }
-        });
+        drizzle.query().select("*").execute({ start: function(query) {
+            test.equal("SELECT *", query);
+            return false;
+        }});
 
         test.throws(
             function () {
@@ -271,27 +290,45 @@ exports["Query"] = testCase({
         }});
 
         test.done();
-    }
-});
-
-exports["Drizzle"] = testCase({
-    "setUp": function(callback) {
-        this.drizzle = new Drizzle();
-        callback();
     },
-    "escape()": function(test) {
+    "select()": function(test) {
         var drizzle = this.drizzle;
-        test.expect(7);
+        test.expect(6);
 
-        test.equal("test", drizzle.escape("test"));
-        test.equal("\\\"string\\\" test", drizzle.escape("\"string\" test"));
-        test.equal("\\'string\\' test", drizzle.escape("\'string\' test"));
-        test.equal("test \\\"string\\\"", drizzle.escape("test \"string\""));
-        test.equal("test \\'string\\'", drizzle.escape("test \'string\'"));
-        test.equal("test \\\"string\\\" middle", drizzle.escape("test \"string\" middle"));
-        test.equal("test \\'string\\' middle", drizzle.escape("test \'string\' middle"));
-        
+        test.throws(
+            function () {
+                drizzle.query().from();
+            },
+            "Argument \"fields\" is mandatory"
+        );
+
+        drizzle.query().from("users").execute({ start: function(query) {
+            test.equal("FROM `users`", query);
+            return false;
+        }});
+
+        drizzle.query().from("users, profiles", false).execute({ start: function(query) {
+            test.equal("FROM users, profiles", query);
+            return false;
+        }});
+
+        test.throws(
+            function () {
+                drizzle.query().from({});
+            },
+            "Non empty objects should be used for aliasing in from"
+        );
+
+        drizzle.query().from({"users_alias": "users"}).execute({ start: function(query) {
+            test.equal("FROM `users` AS `users_alias`", query);
+            return false;
+        }});
+
+        drizzle.query().from({"users_alias": "users"}, false).execute({ start: function(query) {
+            test.equal("FROM users AS users_alias", query);
+            return false;
+        }});
+
         test.done();
     }
 });
-

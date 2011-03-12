@@ -22,109 +22,123 @@ do {                                                                      \
                 v8::Integer::New(constant),                               \
                 static_cast<v8::PropertyAttribute>(v8::ReadOnly|v8::DontDelete))
 
+#define THROW_EXCEPTION(message) \
+    return v8::ThrowException(v8::Exception::Error(v8::String::New(message)));
+
 #define ARG_CHECK_OPTIONAL_STRING(I, VAR) \
     if (args.Length() > I && !args[I]->IsString()) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Argument \"" #VAR "\" must be a valid string"))); \
+        THROW_EXCEPTION("Argument \"" #VAR "\" must be a valid string") \
     }
 
 #define ARG_CHECK_STRING(I, VAR) \
     if (args.Length() <= I) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Argument \"" #VAR "\" is mandatory"))); \
+        THROW_EXCEPTION("Argument \"" #VAR "\" is mandatory") \
     } else if (!args[I]->IsString()) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Argument \"" #VAR "\" must be a valid string"))); \
+        THROW_EXCEPTION("Argument \"" #VAR "\" must be a valid string") \
+    }
+
+#define ARG_CHECK_OPTIONAL_BOOL(I, VAR) \
+    if (args.Length() > I && !args[I]->IsBoolean()) { \
+        THROW_EXCEPTION("Argument \"" #VAR "\" must be a valid boolean") \
+    }
+
+#define ARG_CHECK_BOOL(I, VAR) \
+    if (args.Length() <= I) { \
+        THROW_EXCEPTION("Argument \"" #VAR "\" is mandatory") \
+    } else if (!args[I]->IsBoolean()) { \
+        THROW_EXCEPTION("Argument \"" #VAR "\" must be a valid boolean") \
     }
 
 #define ARG_CHECK_OPTIONAL_OBJECT(I, VAR) \
     if (args.Length() > I && (!args[I]->IsObject() || args[I]->IsFunction() || args[I]->IsUndefined())) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Argument \"" #VAR "\" must be a valid object"))); \
+        THROW_EXCEPTION("Argument \"" #VAR "\" must be a valid object") \
     }
 
 #define ARG_CHECK_OBJECT(I, VAR) \
     if (args.Length() <= I) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Argument \"" #VAR "\" is mandatory"))); \
+        THROW_EXCEPTION("Argument \"" #VAR "\" is mandatory") \
     } else if (!args[I]->IsObject() || args[I]->IsFunction() || args[I]->IsUndefined()) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Argument \"" #VAR "\" must be a valid object"))); \
+        THROW_EXCEPTION("Argument \"" #VAR "\" must be a valid object") \
     }
 
 #define ARG_CHECK_OPTIONAL_FUNCTION(I, VAR) \
     if (args.Length() > I && !args[I]->IsFunction()) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Argument \"" #VAR "\" must be a valid function"))); \
+        THROW_EXCEPTION("Argument \"" #VAR "\" must be a valid function") \
     }
 
 #define ARG_CHECK_FUNCTION(I, VAR) \
     if (args.Length() <= I) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Argument \"" #VAR "\" is mandatory"))); \
+        THROW_EXCEPTION("Argument \"" #VAR "\" is mandatory") \
     } else if (!args[I]->IsFunction()) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Argument \"" #VAR "\" must be a valid function"))); \
+        THROW_EXCEPTION("Argument \"" #VAR "\" must be a valid function") \
     }
 
 #define ARG_CHECK_OPTIONAL_ARRAY(I, VAR) \
     if (args.Length() > I && args[I]->IsArray()) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Argument \"" #VAR "\" must be a valid array"))); \
+        THROW_EXCEPTION("Argument \"" #VAR "\" must be a valid array") \
     }
 
 #define ARG_CHECK_ARRAY(I, VAR) \
     if (args.Length() <= I) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Argument \"" #VAR "\" is mandatory"))); \
+        THROW_EXCEPTION("Argument \"" #VAR "\" is mandatory") \
     } else if (!args[I]->IsArray()) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Argument \"" #VAR "\" must be a valid array"))); \
+        THROW_EXCEPTION("Argument \"" #VAR "\" must be a valid array") \
     }
 
 #define ARG_CHECK_OBJECT_ATTR_STRING(VAR, KEY) \
     v8::Local<v8::String> KEY##_##key = v8::String::New("" #KEY ""); \
     if (!VAR->Has(KEY##_##key)) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Option \"" #KEY "\" is mandatory"))); \
+        THROW_EXCEPTION("Option \"" #KEY "\" is mandatory") \
     } else if (!VAR->Get(KEY##_##key)->IsString()) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Option \"" #KEY "\" must be a valid string"))); \
+        THROW_EXCEPTION("Option \"" #KEY "\" must be a valid string") \
     }
 
 #define ARG_CHECK_OBJECT_ATTR_OPTIONAL_STRING(VAR, KEY) \
     v8::Local<v8::String> KEY##_##key = v8::String::New("" #KEY ""); \
     if (VAR->Has(KEY##_##key) && !VAR->Get(KEY##_##key)->IsString()) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Option \"" #KEY "\" must be a valid string"))); \
+        THROW_EXCEPTION("Option \"" #KEY "\" must be a valid string") \
     }
 
 #define ARG_CHECK_OBJECT_ATTR_UINT32(VAR, KEY) \
     v8::Local<v8::String> KEY##_##key = v8::String::New("" #KEY ""); \
     if (!VAR->Has(KEY##_##key)) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Option \"" #KEY "\" is mandatory"))); \
+        THROW_EXCEPTION("Option \"" #KEY "\" is mandatory") \
     } else if (!VAR->Get(KEY##_##key)->IsUint32()) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Option \"" #KEY "\" must be a valid UINT32"))); \
+        THROW_EXCEPTION("Option \"" #KEY "\" must be a valid UINT32") \
     }
 
 #define ARG_CHECK_OBJECT_ATTR_OPTIONAL_UINT32(VAR, KEY) \
     v8::Local<v8::String> KEY##_##key = v8::String::New("" #KEY ""); \
     if (VAR->Has(KEY##_##key) && !VAR->Get(KEY##_##key)->IsUint32()) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Option \"" #KEY "\" must be a valid UINT32"))); \
+        THROW_EXCEPTION("Option \"" #KEY "\" must be a valid UINT32") \
     }
 
 #define ARG_CHECK_OBJECT_ATTR_BOOL(VAR, KEY) \
     v8::Local<v8::String> KEY##_##key = v8::String::New("" #KEY ""); \
     if (!VAR->Has(KEY##_##key)) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Option \"" #KEY "\" is mandatory"))); \
+        THROW_EXCEPTION("Option \"" #KEY "\" is mandatory") \
     } else if (!VAR->Get(KEY##_##key)->IsBoolean()) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Option \"" #KEY "\" must be a valid boolean"))); \
+        THROW_EXCEPTION("Option \"" #KEY "\" must be a valid boolean") \
     }
 
 #define ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(VAR, KEY) \
     v8::Local<v8::String> KEY##_##key = v8::String::New("" #KEY ""); \
     if (VAR->Has(KEY##_##key) && !VAR->Get(KEY##_##key)->IsBoolean()) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Option \"" #KEY "\" must be a valid boolean"))); \
+        THROW_EXCEPTION("Option \"" #KEY "\" must be a valid boolean") \
     }
 
 #define ARG_CHECK_OBJECT_ATTR_FUNCTION(VAR, KEY) \
     v8::Local<v8::String> KEY##_##key = v8::String::New("" #KEY ""); \
     if (!VAR->Has(KEY##_##key)) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Option \"" #KEY "\" is mandatory"))); \
+        THROW_EXCEPTION("Option \"" #KEY "\" is mandatory") \
     } else if (!VAR->Get(KEY##_##key)->IsFunction()) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Option \"" #KEY "\" must be a valid function"))); \
+        THROW_EXCEPTION("Option \"" #KEY "\" must be a valid function") \
     }
 
 #define ARG_CHECK_OBJECT_ATTR_OPTIONAL_FUNCTION(VAR, KEY) \
     v8::Local<v8::String> KEY##_##key = v8::String::New("" #KEY ""); \
     if (VAR->Has(KEY##_##key) && !VAR->Get(KEY##_##key)->IsFunction()) { \
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Option \"" #KEY "\" must be a valid function"))); \
+        THROW_EXCEPTION("Option \"" #KEY "\" must be a valid function") \
     }
-
 
 #endif  // SRC_DRIZZLE_BINDINGS_H_

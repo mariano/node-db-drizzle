@@ -46,7 +46,7 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::New(const v8::Arguments& args) {
 
     node_drizzle::Drizzle *drizzle = new node_drizzle::Drizzle();
     if (drizzle == NULL) {
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Can't create client object")));
+        THROW_EXCEPTION("Can't create client object")
     }
 
     if (args.Length() > 0) {
@@ -86,7 +86,7 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::Connect(const v8::Arguments& args) 
 
     connect_request_t *request = new connect_request_t();
     if (request == NULL) {
-        return v8::ThrowException(v8::Exception::Error(v8::String::New("Could not create EIO request")));
+        THROW_EXCEPTION("Could not create EIO request")
     }
 
     request->drizzle = drizzle;
@@ -238,7 +238,7 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::Escape(const v8::Arguments& args) {
         std::string unescaped(*string);
         escaped = drizzle->connection.escape(unescaped);
     } catch(const drizzle::Exception& exception) {
-        return v8::ThrowException(v8::Exception::Error(v8::String::New(exception.what())));
+        THROW_EXCEPTION(exception.what())
     }
 
     return scope.Close(v8::String::New(escaped.c_str()));
