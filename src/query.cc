@@ -21,6 +21,7 @@ void node_drizzle::Query::Init(v8::Handle<v8::Object> target) {
 
     NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "select", Select);
     NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "from", From);
+    NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "join", Join);
     NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "where", Where);
     NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "execute", Execute);
 
@@ -249,6 +250,80 @@ v8::Handle<v8::Value> node_drizzle::Query::From(const v8::Arguments& args) {
         if (escape) {
             query->sql << node_drizzle::Query::quoteTable;
         }
+    }
+
+    return args.This();
+}
+
+v8::Handle<v8::Value> node_drizzle::Query::Join(const v8::Arguments& args) {
+    v8::HandleScope scope;
+
+    ARG_CHECK_OBJECT(0, join);
+    ARG_CHECK_OPTIONAL_ARRAY(1, values);
+
+    v8::Local<v8::Object> join = args[0]->ToObject();
+
+    ARG_CHECK_OBJECT_ATTR_OPTIONAL_STRING(join, type);
+    ARG_CHECK_OBJECT_ATTR_STRING(join, table);
+    ARG_CHECK_OBJECT_ATTR_OPTIONAL_STRING(join, alias);
+    ARG_CHECK_OBJECT_ATTR_OPTIONAL_STRING(join, conditions);
+    ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(join, escape);
+
+    node_drizzle::Query *query = node::ObjectWrap::Unwrap<node_drizzle::Query>(args.This());
+    assert(query);
+
+    std::string type = "INNER";
+    bool escape = true;
+
+    if (join->Has(type_key)) {
+        v8::String::Utf8Value currentType(join->Get(type_key)->ToString());
+        type = *currentType;
+        std::transform(type.begin(), type.end(), type.begin(), toupper);
+    }
+
+    if (join->Has(escape_key)) {
+        escape = join->Get(escape_key)->IsTrue();
+    }
+
+    v8::String::Utf8Value table(join->Get(table_key)->ToString());
+
+    query->sql << " " << type << " JOIN ";
+    if (escape) {
+        query->sql << node_drizzle::Query::quoteTable;
+    }
+    query->sql << *table;
+    if (escape) {
+        query->sql << node_drizzle::Query::quoteTable;
+    }
+
+    if (join->Has(alias_key)) {
+        v8::String::Utf8Value alias(join->Get(alias_key)->ToString());
+
+        query->sql << " AS ";
+        if (escape) {
+            query->sql << node_drizzle::Query::quoteTable;
+        }
+        query->sql << *alias;
+        if (escape) {
+            query->sql << node_drizzle::Query::quoteTable;
+        }
+    }
+
+    if (join->Has(conditions_key)) {
+        v8::String::Utf8Value conditions(join->Get(conditions_key)->ToObject());
+        std::string currentConditions = *conditions;
+        v8::Local<v8::Array> currentValues;
+        if (args.Length() > 1) {
+            currentValues = v8::Array::Cast(*args[1]);
+        }
+
+        try {
+            currentConditions = query->parseQuery(currentConditions, *currentValues);
+        } catch(const drizzle::Exception& exception) {
+            THROW_EXCEPTION(exception.what())
+        }
+
+        query->sql << " ON (" << currentConditions << ")";
     }
 
     return args.This();

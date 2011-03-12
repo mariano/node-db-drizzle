@@ -391,5 +391,82 @@ exports["Query"] = testCase({
         }});
 
         test.done();
+    },
+    "join()": function(test) {
+        var drizzle = this.drizzle;
+        test.expect(8);
+ 
+        test.throws(
+            function () {
+                drizzle.query().join();
+            },
+            "Argument \"join\" is mandatory"
+        );
+
+        drizzle.query().join({ "table": "profiles" }).execute({ start: function(query) {
+            test.equal(" INNER JOIN `profiles`", query);
+            return false;
+        }});
+
+        drizzle.query().join({ 
+            "table": "profiles",
+            "alias": "p" 
+        }).execute({ start: function(query) {
+            test.equal(" INNER JOIN `profiles` AS `p`", query);
+            return false;
+        }});
+
+        drizzle.query().join({ 
+            "table": "profiles",
+            "alias": "p",
+            "conditions": "p.id = u.profile_id"
+        }).execute({ start: function(query) {
+            test.equal(" INNER JOIN `profiles` AS `p` ON (p.id = u.profile_id)", query);
+            return false;
+        }});
+
+        test.throws(
+            function () {
+                drizzle.query().join({ 
+                    "table": "profiles",
+                    "alias": "p",
+                    "conditions": "p.id = u.profile_id"
+                }, [ 1, new Date(2011, 2, 12, 19, 49, 0) ]);
+            },
+            "Wrong number of values to escape"
+        );
+
+        drizzle.query().join(
+            { 
+            "table": "profiles",
+            "alias": "p",
+            "conditions": "p.id = u.profile_id AND approved = ? AND created >= ?"
+            },
+            [ 1, new Date(2011, 2, 12, 19, 49, 0) ]
+        ).execute({ start: function(query) {
+            test.equal(" INNER JOIN `profiles` AS `p` ON (p.id = u.profile_id AND approved = 1 AND created >= '2011-03-12 19:49:00')", query);
+            return false;
+        }});
+
+        drizzle.query().join({ 
+            "type": "left",
+            "escape": false,
+            "table": "(t2,t3,t4)"
+        }).execute({ start: function(query) {
+            test.equal(" LEFT JOIN (t2,t3,t4)", query);
+            return false;
+        }});
+
+        drizzle.query().join({ 
+            "type": "left",
+            "escape": false,
+            "table": "(t2 CROSS JOIN t3 CROSS JOIN t4)",
+            "conditions": "t2.a=t1.a AND t3.b=t1.b AND t4.c=t1.c"
+        }).execute({ start: function(query) {
+            test.equal(" LEFT JOIN (t2 CROSS JOIN t3 CROSS JOIN t4) ON (t2.a=t1.a AND t3.b=t1.b AND t4.c=t1.c)", query);
+            return false;
+        }});
+
+        test.done();
     }
 });

@@ -6,6 +6,8 @@
 #include <node.h>
 #include <node_buffer.h>
 #include <node_events.h>
+#include <algorithm>
+#include <cctype>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -49,6 +51,7 @@ class Query : public node::EventEmitter {
         static v8::Handle<v8::Value> New(const v8::Arguments& args);
         static v8::Handle<v8::Value> Select(const v8::Arguments& args);
         static v8::Handle<v8::Value> From(const v8::Arguments& args);
+        static v8::Handle<v8::Value> Join(const v8::Arguments& args);
         static v8::Handle<v8::Value> Where(const v8::Arguments& args);
         static v8::Handle<v8::Value> Execute(const v8::Arguments& args);
         static int eioExecute(eio_req* eioRequest);
