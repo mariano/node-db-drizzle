@@ -11,11 +11,10 @@ from os.path import exists
 
 srcdir = "."
 blddir = "build"
-VERSION = "1.2.4"
+VERSION = "0.2.2"
 
 def set_options(opt):
   opt.tool_options("compiler_cxx")
-  opt.add_option('--nodeunit', action='store_true', help='Run tests with nodeunit')
   opt.add_option('--debug', action='store_true', help='Run tests with node_g')
   opt.add_option('--warn', action='store_true', help='Enable extra -W* compiler flags')
 
@@ -44,10 +43,8 @@ def build(bld):
   obj.uselib = "DRIZZLE"
 
 def test(tst):
-  test_binary = 'node'
-  if Options.options.nodeunit:
-    test_binary = 'nodeunit'
-  elif Options.options.debug:
+  test_binary = 'nodeunit'
+  if Options.options.debug:
     test_binary = 'nodeunit_g'
   
   Utils.exec_command(test_binary + ' tests.js')

@@ -102,14 +102,14 @@ v8::Handle<v8::Value> node_drizzle::Query::Select(const v8::Arguments& args) {
 
             try {
                 query->sql << query->selectField(fields->Get(i));
-            } catch(drizzle::Exception& exception) {
+            } catch(const drizzle::Exception& exception) {
                 return v8::ThrowException(v8::Exception::Error(v8::String::New(exception.what())));
             }
         }
     } else if (args[0]->IsObject()) {
         try {
             query->sql << query->selectField(args[0]);
-        } catch(drizzle::Exception& exception) {
+        } catch(const drizzle::Exception& exception) {
             return v8::ThrowException(v8::Exception::Error(v8::String::New(exception.what())));
         }
     } else {
