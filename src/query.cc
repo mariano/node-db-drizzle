@@ -72,8 +72,14 @@ void node_drizzle::Query::setConnection(drizzle::Connection* connection) {
 v8::Handle<v8::Value> node_drizzle::Query::Select(const v8::Arguments& args) {
     v8::HandleScope scope;
 
-    if (args.Length() > 0 && args[0]->IsArray()) {
-        ARG_CHECK_ARRAY(0, from);
+    if (args.Length() > 0) {
+        if (args[0]->IsArray()) {
+            ARG_CHECK_ARRAY(0, from);
+        } else if (args[0]->IsObject()) {
+            ARG_CHECK_OBJECT(0, from);
+        } else {
+            ARG_CHECK_STRING(0, from);
+        }
     } else {
         ARG_CHECK_STRING(0, from);
     }
@@ -90,33 +96,21 @@ v8::Handle<v8::Value> node_drizzle::Query::Select(const v8::Arguments& args) {
         }
 
         for (uint32_t i = 0, limiti = fields->Length(); i < limiti; i++) {
-            v8::Local<v8::Value> field = fields->Get(i);
             if (i > 0) {
                 query->sql << ",";
             }
 
-            if (field->IsObject()) {
-                v8::Local<v8::Object> fieldObject = field->ToObject();
-                v8::Local<v8::Array> fieldProperties = fieldObject->GetPropertyNames();
-                if (fieldProperties->Length() == 0) {
-                    return v8::ThrowException(v8::Exception::Error(v8::String::New("Objects should be used for value aliasing in select")));
-                }
-
-                for (uint32_t j = 0, limitj = fieldProperties->Length(); j < limitj; j++) {
-                    v8::Local<v8::Value> propertyName = fieldProperties->Get(j);
-                    v8::String::Utf8Value fieldName(propertyName);
-                    if (j > 0) {
-                        query->sql << ",";
-                    }
-
-                    query->sql << query->value(fieldObject->Get(propertyName)) << " AS " << Query::quoteField << *fieldName << Query::quoteField;
-                }
-            } else if (field->IsString()) {
-                v8::String::Utf8Value fieldName(field->ToString());
-                query->sql << Query::quoteField << *fieldName << Query::quoteField;
-            } else {
-                return v8::ThrowException(v8::Exception::Error(v8::String::New("Incorrect value type provided as field for select")));
+            try {
+                query->sql << query->selectField(fields->Get(i));
+            } catch(drizzle::Exception& exception) {
+                return v8::ThrowException(v8::Exception::Error(v8::String::New(exception.what())));
             }
+        }
+    } else if (args[0]->IsObject()) {
+        try {
+            query->sql << query->selectField(args[0]);
+        } catch(drizzle::Exception& exception) {
+            return v8::ThrowException(v8::Exception::Error(v8::String::New(exception.what())));
         }
     } else {
         v8::String::Utf8Value from(args[0]->ToString());
@@ -124,6 +118,65 @@ v8::Handle<v8::Value> node_drizzle::Query::Select(const v8::Arguments& args) {
     }
 
     return args.This();
+}
+
+std::string node_drizzle::Query::selectField(v8::Local<v8::Value> value) const throw(drizzle::Exception&) {
+    std::ostringstream buffer;
+
+    if (value->IsObject()) {
+        v8::Local<v8::Object> valueObject = value->ToObject();
+        v8::Local<v8::Array> valueProperties = valueObject->GetPropertyNames();
+        if (valueProperties->Length() == 0) {
+            throw drizzle::Exception("Non empty objects should be used for value aliasing in select");
+        }
+
+        for (uint32_t j = 0, limitj = valueProperties->Length(); j < limitj; j++) {
+            v8::Local<v8::Value> propertyName = valueProperties->Get(j);
+            v8::String::Utf8Value fieldName(propertyName);
+
+            v8::Local<v8::Value> currentValue = valueObject->Get(propertyName);
+            if (currentValue->IsObject() && !currentValue->IsArray() && !currentValue->IsFunction() && !currentValue->IsDate()) {
+                v8::Local<v8::Object> currentObject = currentValue->ToObject();
+                v8::Local<v8::String> escapeKey = v8::String::New("escape");
+                v8::Local<v8::String> valueKey = v8::String::New("value");
+                v8::Local<v8::Value> optionValue;
+                bool escape = false;
+
+                if (!currentObject->Has(valueKey)) {
+                    throw drizzle::Exception("The \"value\" option for the select field object must be specified");
+                }
+
+                if (currentObject->Has(escapeKey)) {
+                    optionValue = currentObject->Get(escapeKey);
+                    if (!optionValue->IsBoolean()) {
+                        throw drizzle::Exception("Specify a valid boolean value for the escape \"option\" in the select field object");
+                    }
+                    escape = optionValue->IsTrue();
+                }
+
+                if (j > 0) {
+                    buffer << ",";
+                }
+
+                buffer << this->value(currentObject->Get(valueKey), false, escape);
+            } else {
+                if (j > 0) {
+                    buffer << ",";
+                }
+
+                buffer << this->value(currentValue, false, currentValue->IsString() ? false : true);
+            }
+
+            buffer << " AS " << Query::quoteField << *fieldName << Query::quoteField;
+        }
+    } else if (value->IsString()) {
+        v8::String::Utf8Value fieldName(value->ToString());
+        buffer << Query::quoteField << *fieldName << Query::quoteField;
+    } else {
+        throw drizzle::Exception("Incorrect value type provided as field for select");
+    }
+
+    return buffer.str();
 }
 
 v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
@@ -550,7 +603,7 @@ std::string node_drizzle::Query::parseQuery(const std::string& query, v8::Persis
     return parsed;
 }
 
-std::string node_drizzle::Query::value(v8::Local<v8::Value> value, bool inArray) const throw(drizzle::Exception&) {
+std::string node_drizzle::Query::value(v8::Local<v8::Value> value, bool inArray, bool escape) const throw(drizzle::Exception&) {
     std::ostringstream currentStream;
 
     if (value->IsArray()) {
@@ -566,13 +619,13 @@ std::string node_drizzle::Query::value(v8::Local<v8::Value> value, bool inArray)
                 currentStream << ",";
             }
 
-            currentStream << this->value(child, true);
+            currentStream << this->value(child, true, escape);
         }
         if (!inArray) {
             currentStream << ")";
         }
     } else if (value->IsDate()) {
-        currentStream << Query::quoteString <<  this->fromDate(v8::Date::Cast(*value)->NumberValue()) << Query::quoteString;
+        currentStream << Query::quoteString << this->fromDate(v8::Date::Cast(*value)->NumberValue()) << Query::quoteString;
     } else if (value->IsBoolean()) {
         currentStream << (value->IsTrue() ? "1" : "0");
     } else if (value->IsNumber()) {
@@ -580,7 +633,11 @@ std::string node_drizzle::Query::value(v8::Local<v8::Value> value, bool inArray)
     } else if (value->IsString()) {
         v8::String::Utf8Value currentString(value->ToString());
         std::string string = *currentString;
-        currentStream << Query::quoteString << this->connection->escape(string) << Query::quoteString;
+        if (escape) {
+            currentStream << Query::quoteString << this->connection->escape(string) << Query::quoteString;
+        } else {
+            currentStream << string;
+        }
     }
 
     return currentStream.str();

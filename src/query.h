@@ -50,9 +50,10 @@ class Query : public node::EventEmitter {
         static v8::Handle<v8::Value> Execute(const v8::Arguments& args);
         static int eioExecute(eio_req* eioRequest);
         static int eioExecuteFinished(eio_req* eioRequest);
+        std::string selectField(v8::Local<v8::Value> value) const throw(drizzle::Exception&);
         v8::Local<v8::Object> row(drizzle::Result* result, std::string** currentRow, bool cast) const;
         std::string parseQuery(const std::string& query, v8::Persistent<v8::Array> values) const throw(drizzle::Exception&);
-        std::string value(v8::Local<v8::Value> value, bool inArray = false) const throw(drizzle::Exception&);
+        std::string value(v8::Local<v8::Value> value, bool inArray = false, bool escape = true) const throw(drizzle::Exception&);
 
     private:
         uint64_t toDate(const std::string& value, bool hasTime) const throw(drizzle::Exception&);
