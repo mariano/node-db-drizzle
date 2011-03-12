@@ -6,6 +6,9 @@ v8::Persistent<v8::String> node_drizzle::Query::sySuccess;
 v8::Persistent<v8::String> node_drizzle::Query::syError;
 v8::Persistent<v8::String> node_drizzle::Query::syEach;
 
+char node_drizzle::Query::quoteString = '\'';
+char node_drizzle::Query::quoteField = '`';
+
 void node_drizzle::Query::Init(v8::Handle<v8::Object> target) {
     v8::HandleScope scope;
 
@@ -15,6 +18,7 @@ void node_drizzle::Query::Init(v8::Handle<v8::Object> target) {
     constructorTemplate->Inherit(node::EventEmitter::constructor_template);
     constructorTemplate->InstanceTemplate()->SetInternalFieldCount(1);
 
+    NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "select", Select);
     NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "execute", Execute);
 
     target->Set(v8::String::NewSymbol("Query"), constructorTemplate->GetFunction());
@@ -65,6 +69,63 @@ void node_drizzle::Query::setConnection(drizzle::Connection* connection) {
     this->connection = connection;
 }
 
+v8::Handle<v8::Value> node_drizzle::Query::Select(const v8::Arguments& args) {
+    v8::HandleScope scope;
+
+    if (args.Length() > 0 && args[0]->IsArray()) {
+        ARG_CHECK_ARRAY(0, from);
+    } else {
+        ARG_CHECK_STRING(0, from);
+    }
+
+    node_drizzle::Query *query = node::ObjectWrap::Unwrap<node_drizzle::Query>(args.This());
+    assert(query);
+
+    query->sql << "SELECT ";
+
+    if (args[0]->IsArray()) {
+        v8::Local<v8::Array> fields = v8::Array::Cast(*args[0]);
+        if (fields->Length() == 0) {
+            return v8::ThrowException(v8::Exception::Error(v8::String::New("No fields specified in select")));
+        }
+
+        for (uint32_t i=0, limiti=fields->Length(); i < limiti; i++) {
+            v8::Local<v8::Value> field = fields->Get(i);
+            if (i > 0) {
+                query->sql << ",";
+            }
+
+            if (field->IsObject()) {
+                v8::Local<v8::Object> fieldObject = field->ToObject();
+                v8::Local<v8::Array> fieldProperties = fieldObject->GetPropertyNames();
+                if (fieldProperties->Length() == 0) {
+                    return v8::ThrowException(v8::Exception::Error(v8::String::New("Objects should be used for value aliasing in select")));
+                }
+
+                for (uint32_t j=0, limitj=fieldProperties->Length(); j < limitj; j++) {
+                    v8::Local<v8::Value> propertyName = fieldProperties->Get(j);
+                    v8::String::Utf8Value fieldName(propertyName);
+                    if (j > 0) {
+                        query->sql << ",";
+                    }
+
+                    query->sql << query->value(fieldObject->Get(propertyName)) << " AS " << Query::quoteField << *fieldName << Query::quoteField;
+                }
+            } else if (field->IsString()) {
+                v8::String::Utf8Value fieldName(field->ToString());
+                query->sql << Query::quoteField << *fieldName << Query::quoteField;
+            } else {
+                return v8::ThrowException(v8::Exception::Error(v8::String::New("Incorrect value type provided as field for select")));
+            }
+        }
+    } else {
+        v8::String::Utf8Value from(args[0]->ToString());
+        query->sql << *from;
+    }
+
+    return args.This();
+}
+
 v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
     v8::HandleScope scope;
 
@@ -78,15 +139,17 @@ v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
         }
     }
 
+    std::string sql = query->sql.str();
+
     try {
-        query->sql = query->parseQuery(query->sql, query->values);
+        sql = query->parseQuery(sql, query->values);
     } catch(const drizzle::Exception& exception) {
         return v8::ThrowException(v8::Exception::Error(v8::String::New(exception.what())));
     }
 
     if (query->cbStart != NULL && !query->cbStart->IsEmpty()) {
         v8::Local<v8::Value> argv[1];
-        argv[0] = v8::String::New(query->sql.c_str());
+        argv[0] = v8::String::New(sql.c_str());
 
         v8::TryCatch tryCatch;
         v8::Handle<v8::Value> result = (*(query->cbStart))->Call(v8::Context::GetCurrent()->Global(), 1, argv);
@@ -99,7 +162,7 @@ v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
                 return v8::Undefined();
             } else if (result->IsString()) {
                 v8::String::Utf8Value modifiedQuery(result->ToString());
-                query->sql = *modifiedQuery;
+                sql = *modifiedQuery;
             }
         }
     }
@@ -108,6 +171,10 @@ v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
     if (request == NULL) {
         return v8::ThrowException(v8::Exception::Error(v8::String::New("Could not create EIO request")));
     }
+
+    query->sql.str("");
+    query->sql.clear();
+    query->sql << sql;
 
     request->query = query;
     request->result = NULL;
@@ -127,7 +194,7 @@ int node_drizzle::Query::eioExecute(eio_req* eioRequest) {
     assert(request->query->connection);
 
     try {
-        request->result = request->query->connection->query(request->query->sql);
+        request->result = request->query->connection->query(request->query->sql.str());
         if (request->result != NULL) {
             request->rows = new std::vector<std::string**>();
 
@@ -324,8 +391,10 @@ v8::Handle<v8::Value> node_drizzle::Query::set(const v8::Arguments& args) {
     }
 
     if (queryIndex >= 0) {
-        v8::String::Utf8Value sql(args[queryIndex]->ToString());
-        this->sql = *sql;
+        v8::String::Utf8Value initialSql(args[queryIndex]->ToString());
+        this->sql.str("");
+        this->sql.clear();
+        this->sql << *initialSql;
     }
 
     if (optionsIndex >= 0) {
@@ -358,7 +427,8 @@ v8::Handle<v8::Value> node_drizzle::Query::set(const v8::Arguments& args) {
     }
 
     if (valuesIndex >= 0) {
-        this->values = v8::Array::Cast(*args[valuesIndex]);
+        v8::Local<v8::Array> values = v8::Array::Cast(*args[valuesIndex]);
+        this->values = v8::Persistent<v8::Array>::New(values);
     }
 
     if (callbackIndex >= 0) {
@@ -457,7 +527,7 @@ std::string node_drizzle::Query::parseQuery(const std::string& query, v8::Persis
             escaped = true;
         } else if (quote && currentChar == quote) {
             quote = 0;
-        } else if (!quote && (currentChar == '\'' || currentChar == '"')) {
+        } else if (!quote && (currentChar == Query::quoteString)) {
             quote = currentChar;
         } else if (!quote && currentChar == '?') {
             positions.push_back(i - delta);
@@ -502,7 +572,7 @@ std::string node_drizzle::Query::value(v8::Local<v8::Value> value, bool inArray)
             currentStream << ")";
         }
     } else if (value->IsDate()) {
-        currentStream << '\'' <<  this->fromDate(v8::Date::Cast(*value)->NumberValue()) << '\'';
+        currentStream << Query::quoteString <<  this->fromDate(v8::Date::Cast(*value)->NumberValue()) << Query::quoteString;
     } else if (value->IsBoolean()) {
         currentStream << (value->IsTrue() ? "1" : "0");
     } else if (value->IsNumber()) {
@@ -510,7 +580,7 @@ std::string node_drizzle::Query::value(v8::Local<v8::Value> value, bool inArray)
     } else if (value->IsString()) {
         v8::String::Utf8Value currentString(value->ToString());
         std::string string = *currentString;
-        currentStream << '\'' <<  this->connection->escape(string) << '\'';
+        currentStream << Query::quoteString << this->connection->escape(string) << Query::quoteString;
     }
 
     return currentStream.str();

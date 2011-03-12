@@ -31,7 +31,7 @@ class Query : public node::EventEmitter {
             std::vector<std::string**>* rows;
         };
         drizzle::Connection* connection;
-        std::string sql;
+        std::ostringstream sql;
         bool cast;
         v8::Persistent<v8::Array> values;
         v8::Persistent<v8::Function>* cbStart;
@@ -40,10 +40,13 @@ class Query : public node::EventEmitter {
         static v8::Persistent<v8::String> syError;
         static v8::Persistent<v8::String> sySuccess;
         static v8::Persistent<v8::String> syEach;
+        static char quoteString;
+        static char quoteField;
 
         Query();
         ~Query();
         static v8::Handle<v8::Value> New(const v8::Arguments& args);
+        static v8::Handle<v8::Value> Select(const v8::Arguments& args);
         static v8::Handle<v8::Value> Execute(const v8::Arguments& args);
         static int eioExecute(eio_req* eioRequest);
         static int eioExecuteFinished(eio_req* eioRequest);

@@ -6,15 +6,19 @@ var assert = require("assert");
 var drizzle = new Drizzle();
 
 assert.equal("test", drizzle.escape("test"));
+assert.equal("\\\"string\\\" test", drizzle.escape("\"string\" test"));
+assert.equal("\\'string\\' test", drizzle.escape("\'string\' test"));
 assert.equal("test \\\"string\\\"", drizzle.escape("test \"string\""));
 assert.equal("test \\'string\\'", drizzle.escape("test \'string\'"));
+assert.equal("test \\\"string\\\" middle", drizzle.escape("test \"string\" middle"));
+assert.equal("test \\'string\\' middle", drizzle.escape("test \'string\' middle"));
 
 drizzle.query("SELECT * FROM users", {
     start: function (query) {
         assert.equal("SELECT * FROM users", query);
         return false;
     }
-});
+}).execute();
 
 assert.throws(
     function () {
@@ -45,7 +49,7 @@ drizzle.query("SELECT * FROM users WHERE id = ?",
             return false;
         }
     }
-);
+).execute();
 
 drizzle.query("SELECT * FROM users WHERE id = ? AND created > ?", 
     [ 2, "2011-03-09 12:00:00" ],
@@ -55,7 +59,7 @@ drizzle.query("SELECT * FROM users WHERE id = ? AND created > ?",
             return false;
         }
     }
-);
+).execute();
 
 drizzle.query("SELECT * FROM users WHERE id = ? AND created > ?", 
     [ 2, new Date(2011, 2, 9, 12, 0, 0) ],
@@ -65,7 +69,7 @@ drizzle.query("SELECT * FROM users WHERE id = ? AND created > ?",
             return false;
         }
     }
-);
+).execute();
 
 drizzle.query("SELECT * FROM users WHERE id IN ?", 
     [ [1, 2] ],
@@ -75,7 +79,7 @@ drizzle.query("SELECT * FROM users WHERE id IN ?",
             return false;
         }
     }
-);
+).execute();
 
 drizzle.query("SELECT * FROM users WHERE role IN ?", 
     [ ["admin", "moderator"] ],
@@ -85,7 +89,7 @@ drizzle.query("SELECT * FROM users WHERE role IN ?",
             return false;
         }
     }
-);
+).execute();
 
 drizzle.query("SELECT * FROM users WHERE name IN ?", 
     [ ["John Doe", "Jane O'Hara"] ],
@@ -95,7 +99,17 @@ drizzle.query("SELECT * FROM users WHERE name IN ?",
             return false;
         }
     }
-);
+).execute();
+
+drizzle.query("SELECT * FROM users WHERE name = ?", 
+    [ "Jane O'Hara" ],
+    {
+        start: function (query) {
+            assert.equal("SELECT * FROM users WHERE name = 'Jane O\\'Hara'", query);
+            return false;
+        }
+    }
+).execute();
 
 var created = new Date();
 drizzle.query("INSERT INTO users(username,name,age,created,approved) VALUES ?", 
@@ -113,7 +127,7 @@ drizzle.query("INSERT INTO users(username,name,age,created,approved) VALUES ?",
             return false;
         }
     }
-);
+).execute();
 
 drizzle.query("INSERT INTO users(username,name,age,created,approved) VALUES ?", 
     [
@@ -125,7 +139,7 @@ drizzle.query("INSERT INTO users(username,name,age,created,approved) VALUES ?",
             return false;
         }
     }
-);
+).execute();
 
 drizzle.query("INSERT INTO users(username,name,age,created,approved) VALUES ?", 
     [ [
@@ -137,7 +151,7 @@ drizzle.query("INSERT INTO users(username,name,age,created,approved) VALUES ?",
             return false;
         }
     }
-);
+).execute();
 
 drizzle.query("INSERT INTO users(username,name,age,created,approved) VALUES ?", 
     [ [
@@ -155,7 +169,7 @@ drizzle.query("INSERT INTO users(username,name,age,created,approved) VALUES ?",
             return false;
         }
     }
-);
+).execute();
 
 drizzle.query("SELECT *, 'Use ? mark' FROM users WHERE id = ? AND created > ?", 
     [ 2, "2011-03-09 12:00:00" ],
@@ -165,7 +179,7 @@ drizzle.query("SELECT *, 'Use ? mark' FROM users WHERE id = ? AND created > ?",
             return false;
         }
     }
-);
+).execute();
 
 drizzle.query("SELECT *, 'Use ? mark', ? FROM users WHERE id = ? AND created > ?", 
     [ "Escape 'quotes' for safety", 2, "2011-03-09 12:00:00" ],
@@ -175,7 +189,7 @@ drizzle.query("SELECT *, 'Use ? mark', ? FROM users WHERE id = ? AND created > ?
             return false;
         }
     }
-);
+).execute();
 
 drizzle.query("SELECT *, 'Use ? mark', Unquoted\\?mark, ? FROM users WHERE id = ? AND created > ?", 
     [ "Escape 'quotes' for safety", 2, "2011-03-09 12:00:00" ],
@@ -185,7 +199,7 @@ drizzle.query("SELECT *, 'Use ? mark', Unquoted\\?mark, ? FROM users WHERE id = 
             return false;
         }
     }
-);
+).execute();
 
 drizzle.query("\\?SELECT *, 'Use ? mark', Unquoted\\?mark, ? FROM users WHERE id = ? AND created > ?", 
     [ "Escape 'quotes' for safety", 2, "2011-03-09 12:00:00" ],
@@ -195,4 +209,60 @@ drizzle.query("\\?SELECT *, 'Use ? mark', Unquoted\\?mark, ? FROM users WHERE id
             return false;
         }
     }
+).execute();
+
+assert.throws(
+    function () {
+        drizzle.query().select();
+    },
+    /Argument .* is mandatory/
 );
+
+drizzle.query().select("*").execute({
+    start: function(query) {
+        assert.equal("SELECT *", query);
+        return false;
+    }
+});
+
+assert.throws(
+    function () {
+        drizzle.query().select({});
+    },
+    /Argument .* must be a valid string/
+);
+
+assert.throws(
+    function () {
+        drizzle.query().select([]);
+    },
+    /No fields .*/
+);
+
+assert.throws(
+    function () {
+        drizzle.query().select([1]);
+    },
+    /Incorrect value .*/
+);
+
+drizzle.query().select(["id", "user", {"number": 1}, {"date": new Date(1978,6,13,18,30,0)}]).execute({
+    start: function(query) {
+        assert.equal("SELECT `id`,`user`,1 AS `number`,'1978-07-13 18:30:00' AS `date`", query);
+        return false;
+    }
+});
+
+drizzle.query().select(["id", "user", {"number": 1, "date": new Date(1978,6,13,18,30,0)}]).execute({
+    start: function(query) {
+        assert.equal("SELECT `id`,`user`,1 AS `number`,'1978-07-13 18:30:00' AS `date`", query);
+        return false;
+    }
+});
+
+drizzle.query().select(["id", "user", {"string": "Hello 'world'"}]).execute({
+    start: function(query) {
+        assert.equal("SELECT `id`,`user`,'Hello \\'world\\'' AS `string`", query);
+        return false;
+    }
+});
