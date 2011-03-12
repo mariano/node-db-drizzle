@@ -89,7 +89,7 @@ v8::Handle<v8::Value> node_drizzle::Query::Select(const v8::Arguments& args) {
             return v8::ThrowException(v8::Exception::Error(v8::String::New("No fields specified in select")));
         }
 
-        for (uint32_t i=0, limiti=fields->Length(); i < limiti; i++) {
+        for (uint32_t i = 0, limiti = fields->Length(); i < limiti; i++) {
             v8::Local<v8::Value> field = fields->Get(i);
             if (i > 0) {
                 query->sql << ",";
@@ -102,7 +102,7 @@ v8::Handle<v8::Value> node_drizzle::Query::Select(const v8::Arguments& args) {
                     return v8::ThrowException(v8::Exception::Error(v8::String::New("Objects should be used for value aliasing in select")));
                 }
 
-                for (uint32_t j=0, limitj=fieldProperties->Length(); j < limitj; j++) {
+                for (uint32_t j = 0, limitj = fieldProperties->Length(); j < limitj; j++) {
                     v8::Local<v8::Value> propertyName = fieldProperties->Get(j);
                     v8::String::Utf8Value fieldName(propertyName);
                     if (j > 0) {
