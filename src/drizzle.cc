@@ -54,13 +54,13 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::New(const v8::Arguments& args) {
     if (args.Length() > 0) {
         v8::Handle<v8::Value> set = drizzle->set(args);
         if (!set.IsEmpty()) {
-            return set;
+            return scope.Close(set);
         }
     }
 
     drizzle->Wrap(args.This());
 
-    return args.This();
+    return scope.Close(args.This());
 }
 
 v8::Handle<v8::Value> node_drizzle::Drizzle::Connect(const v8::Arguments& args) {
@@ -74,7 +74,7 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::Connect(const v8::Arguments& args) 
     if (args.Length() > 0) {
         v8::Handle<v8::Value> set = drizzle->set(args);
         if (!set.IsEmpty()) {
-            return set;
+            return scope.Close(set);
         }
 
         v8::Local<v8::Object> options = args[0]->ToObject();
@@ -103,7 +103,7 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::Connect(const v8::Arguments& args) 
         connectFinished(request);
     }
 
-    return v8::Undefined();
+    return scope.Close(v8::Undefined());
 }
 
 v8::Handle<v8::Value> node_drizzle::Drizzle::set(const v8::Arguments& args) {
@@ -213,7 +213,7 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::Disconnect(const v8::Arguments& arg
 
     drizzle->connection.close();
 
-    return v8::Undefined();
+    return scope.Close(v8::Undefined());
 }
 
 v8::Handle<v8::Value> node_drizzle::Drizzle::IsConnected(const v8::Arguments& args) {
@@ -302,7 +302,7 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::Query(const v8::Arguments& args) {
 
     v8::Handle<v8::Value> set = queryInstance->set(args);
     if (!set.IsEmpty()) {
-        return set;
+        return scope.Close(set);
     }
 
     return scope.Close(query);

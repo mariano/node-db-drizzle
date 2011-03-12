@@ -62,13 +62,13 @@ v8::Handle<v8::Value> node_drizzle::Query::New(const v8::Arguments& args) {
     if (args.Length() > 0) {
         v8::Handle<v8::Value> set = query->set(args);
         if (!set.IsEmpty()) {
-            return set;
+            return scope.Close(set);
         }
     }
 
     query->Wrap(args.This());
 
-    return args.This();
+    return scope.Close(args.This());
 }
 
 void node_drizzle::Query::setConnection(drizzle::Connection* connection) {
@@ -123,7 +123,7 @@ v8::Handle<v8::Value> node_drizzle::Query::Select(const v8::Arguments& args) {
         query->sql << *fields;
     }
 
-    return args.This();
+    return scope.Close(args.This());
 }
 
 std::string node_drizzle::Query::selectField(v8::Local<v8::Value> value) const throw(drizzle::Exception&) {
@@ -254,7 +254,7 @@ v8::Handle<v8::Value> node_drizzle::Query::From(const v8::Arguments& args) {
         }
     }
 
-    return args.This();
+    return scope.Close(args.This());
 }
 
 v8::Handle<v8::Value> node_drizzle::Query::Join(const v8::Arguments& args) {
@@ -328,7 +328,7 @@ v8::Handle<v8::Value> node_drizzle::Query::Join(const v8::Arguments& args) {
         query->sql << " ON (" << currentConditions << ")";
     }
 
-    return args.This();
+    return scope.Close(args.This());
 }
 
 v8::Handle<v8::Value> node_drizzle::Query::Where(const v8::Arguments& args) {
@@ -356,7 +356,7 @@ v8::Handle<v8::Value> node_drizzle::Query::Where(const v8::Arguments& args) {
     query->sql << " WHERE ";
     query->sql << currentConditions;
 
-    return args.This();
+    return scope.Close(args.This());
 }
 
 v8::Handle<v8::Value> node_drizzle::Query::Limit(const v8::Arguments& args) {
@@ -381,7 +381,7 @@ v8::Handle<v8::Value> node_drizzle::Query::Limit(const v8::Arguments& args) {
         query->sql << args[0]->ToInt32()->Value();
     }
 
-    return args.This();
+    return scope.Close(args.This());
 }
 
 v8::Handle<v8::Value> node_drizzle::Query::Add(const v8::Arguments& args) {
@@ -395,7 +395,7 @@ v8::Handle<v8::Value> node_drizzle::Query::Add(const v8::Arguments& args) {
     v8::String::Utf8Value sql(args[0]->ToString());
     query->sql << " " << *sql;
 
-    return args.This();
+    return scope.Close(args.This());
 }
 
 v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
@@ -407,7 +407,7 @@ v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
     if (args.Length() > 0) {
         v8::Handle<v8::Value> set = query->set(args);
         if (!set.IsEmpty()) {
-            return set;
+            return scope.Close(set);
         }
     }
 
@@ -431,7 +431,7 @@ v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
 
         if (!result->IsUndefined()) {
             if (result->IsFalse()) {
-                return v8::Undefined();
+                return scope.Close(v8::Undefined());
             } else if (result->IsString()) {
                 v8::String::Utf8Value modifiedQuery(result->ToString());
                 sql = *modifiedQuery;
@@ -457,7 +457,7 @@ v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
     eio_custom(eioExecute, EIO_PRI_DEFAULT, eioExecuteFinished, request);
     ev_ref(EV_DEFAULT_UC);
 
-    return v8::Undefined();
+    return scope.Close(v8::Undefined());
 }
 
 int node_drizzle::Query::eioExecute(eio_req* eioRequest) {
