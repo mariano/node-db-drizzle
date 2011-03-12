@@ -303,12 +303,12 @@ exports["Query"] = testCase({
         );
 
         drizzle.query().from("users").execute({ start: function(query) {
-            test.equal("FROM `users`", query);
+            test.equal(" FROM `users`", query);
             return false;
         }});
 
         drizzle.query().from("users, profiles", false).execute({ start: function(query) {
-            test.equal("FROM users, profiles", query);
+            test.equal(" FROM users, profiles", query);
             return false;
         }});
 
@@ -320,12 +320,64 @@ exports["Query"] = testCase({
         );
 
         drizzle.query().from({"users_alias": "users"}).execute({ start: function(query) {
-            test.equal("FROM `users` AS `users_alias`", query);
+            test.equal(" FROM `users` AS `users_alias`", query);
             return false;
         }});
 
         drizzle.query().from({"users_alias": "users"}, false).execute({ start: function(query) {
-            test.equal("FROM users AS users_alias", query);
+            test.equal(" FROM users AS users_alias", query);
+            return false;
+        }});
+
+        test.done();
+    },
+    "where()": function(test) {
+        var drizzle = this.drizzle;
+        test.expect(8);
+
+        test.throws(
+            function () {
+                drizzle.query().where();
+            },
+            "Argument \"conditions\" is mandatory"
+        );
+
+        drizzle.query().where("1=1").execute({ start: function(query) {
+            test.equal(" WHERE 1=1", query);
+            return false;
+        }});
+
+        drizzle.query().where("id = 1 AND age > 30").execute({ start: function(query) {
+            test.equal(" WHERE id = 1 AND age > 30", query);
+            return false;
+        }});
+
+        drizzle.query().where("name = '?'").execute({ start: function(query) {
+            test.equal(" WHERE name = '?'", query);
+            return false;
+        }});
+
+        test.throws(
+            function () {
+                drizzle.query().where("id = ?");
+            },
+            "Wrong number of values to escape"
+        );
+
+        test.throws(
+            function () {
+                drizzle.query().where("id = ?", []);
+            },
+            "Wrong number of values to escape"
+        );
+
+        drizzle.query().where("id=?", [ 1 ]).execute({ start: function(query) {
+            test.equal(" WHERE id=1", query);
+            return false;
+        }});
+
+        drizzle.query().where("(id=? OR name=?) AND created > ?", [ 1, "Janine O'Hara", new Date(2011,2,12,20,15,0) ]).execute({ start: function(query) {
+            test.equal(" WHERE (id=1 OR name='Janine O\\'Hara') AND created > '2011-03-12 20:15:00'", query);
             return false;
         }});
 

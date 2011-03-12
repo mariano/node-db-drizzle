@@ -74,7 +74,7 @@ do {                                                                      \
     }
 
 #define ARG_CHECK_OPTIONAL_ARRAY(I, VAR) \
-    if (args.Length() > I && args[I]->IsArray()) { \
+    if (args.Length() > I && !args[I]->IsArray()) { \
         THROW_EXCEPTION("Argument \"" #VAR "\" must be a valid array") \
     }
 

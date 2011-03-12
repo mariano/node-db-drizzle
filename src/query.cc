@@ -21,6 +21,7 @@ void node_drizzle::Query::Init(v8::Handle<v8::Object> target) {
 
     NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "select", Select);
     NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "from", From);
+    NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "where", Where);
     NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "execute", Execute);
 
     target->Set(v8::String::NewSymbol("Query"), constructorTemplate->GetFunction());
@@ -204,7 +205,7 @@ v8::Handle<v8::Value> node_drizzle::Query::From(const v8::Arguments& args) {
         escape = args[1]->IsTrue();
     }
 
-    query->sql << "FROM ";
+    query->sql << " FROM ";
 
     if (args[0]->IsObject()) {
         v8::Local<v8::Object> valueObject = args[0]->ToObject();
@@ -253,6 +254,34 @@ v8::Handle<v8::Value> node_drizzle::Query::From(const v8::Arguments& args) {
     return args.This();
 }
 
+v8::Handle<v8::Value> node_drizzle::Query::Where(const v8::Arguments& args) {
+    v8::HandleScope scope;
+
+    ARG_CHECK_STRING(0, conditions);
+    ARG_CHECK_OPTIONAL_ARRAY(1, values);
+
+    node_drizzle::Query *query = node::ObjectWrap::Unwrap<node_drizzle::Query>(args.This());
+    assert(query);
+
+    v8::String::Utf8Value conditions(args[0]->ToString());
+    std::string currentConditions = *conditions;
+    v8::Local<v8::Array> currentValues;
+    if (args.Length() > 1) {
+        currentValues = v8::Array::Cast(*args[1]);
+    }
+
+    try {
+        currentConditions = query->parseQuery(currentConditions, *currentValues);
+    } catch(const drizzle::Exception& exception) {
+        THROW_EXCEPTION(exception.what())
+    }
+
+    query->sql << " WHERE ";
+    query->sql << currentConditions;
+
+    return args.This();
+}
+
 v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
     v8::HandleScope scope;
 
@@ -269,7 +298,7 @@ v8::Handle<v8::Value> node_drizzle::Query::Execute(const v8::Arguments& args) {
     std::string sql = query->sql.str();
 
     try {
-        sql = query->parseQuery(sql, query->values);
+        sql = query->parseQuery(sql, *(query->values));
     } catch(const drizzle::Exception& exception) {
         THROW_EXCEPTION(exception.what())
     }
@@ -635,7 +664,7 @@ v8::Local<v8::Object> node_drizzle::Query::row(drizzle::Result* result, std::str
     return row;
 }
 
-std::string node_drizzle::Query::parseQuery(const std::string& query, v8::Persistent<v8::Array> values) const throw(drizzle::Exception&) {
+std::string node_drizzle::Query::parseQuery(const std::string& query, v8::Array* values) const throw(drizzle::Exception&) {
     std::string parsed(query);
     std::vector<std::string::size_type> positions;
     char quote = 0;
@@ -661,7 +690,7 @@ std::string node_drizzle::Query::parseQuery(const std::string& query, v8::Persis
         }
     }
 
-    uint32_t valuesLength = !values.IsEmpty() ? values->Length() : 0;
+    uint32_t valuesLength = values != NULL ? values->Length() : 0;
     if (positions.size() != valuesLength) {
         throw drizzle::Exception("Wrong number of values to escape");
     }
