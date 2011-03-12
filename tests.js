@@ -468,5 +468,75 @@ exports["Query"] = testCase({
         }});
 
         test.done();
+    },
+    "limit()": function(test) {
+        var drizzle = this.drizzle;
+        test.expect(4);
+ 
+        test.throws(
+            function () {
+                drizzle.query().limit();
+            },
+            "Argument \"rows\" is mandatory"
+        );
+
+        test.throws(
+            function () {
+                drizzle.query().limit("1");
+            },
+            "Argument \"rows\" must be a valid UINT32"
+        );
+
+        drizzle.query().limit(1).execute({ start: function(query) {
+            test.equal(" LIMIT 1", query);
+            return false;
+        }});
+
+        drizzle.query().limit(5, 10).execute({ start: function(query) {
+            test.equal(" LIMIT 5,10", query);
+            return false;
+        }});
+
+        test.done();
+    },
+    "add()": function(test) {
+        var drizzle = this.drizzle;
+        test.expect(3);
+ 
+        test.throws(
+            function () {
+                drizzle.query().add();
+            },
+            "Argument \"join\" is mandatory"
+        );
+
+        drizzle.query().add("one").execute({ start: function(query) {
+            test.equal(" one", query);
+            return false;
+        }});
+
+        drizzle.query().add("one").add("two").execute({ start: function(query) {
+            test.equal(" one two", query);
+            return false;
+        }});
+
+        test.done();
+    },
+    "chained build": function(test) {
+        var drizzle = this.drizzle;
+        test.expect(1);
+
+        drizzle.query().
+            select("*").
+            from("users").
+            join({"table": "profiles", "alias": "p", "conditions": "p.id=users.profile_id"}).
+            where("created > ?", [ new Date(2011,02,12,20,16,0) ]).
+            limit(10).
+            execute({ start: function(query) {
+                test.equal("SELECT * FROM `users` INNER JOIN `profiles` AS `p` ON (p.id=users.profile_id) WHERE created > '2011-03-12 20:16:00' LIMIT 10", query);
+                return false;
+            }});
+
+        test.done();
     }
 });

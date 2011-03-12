@@ -23,6 +23,8 @@ void node_drizzle::Query::Init(v8::Handle<v8::Object> target) {
     NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "from", From);
     NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "join", Join);
     NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "where", Where);
+    NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "limit", Limit);
+    NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "add", Add);
     NODE_ADD_PROTOTYPE_METHOD(constructorTemplate, "execute", Execute);
 
     target->Set(v8::String::NewSymbol("Query"), constructorTemplate->GetFunction());
@@ -353,6 +355,45 @@ v8::Handle<v8::Value> node_drizzle::Query::Where(const v8::Arguments& args) {
 
     query->sql << " WHERE ";
     query->sql << currentConditions;
+
+    return args.This();
+}
+
+v8::Handle<v8::Value> node_drizzle::Query::Limit(const v8::Arguments& args) {
+    v8::HandleScope scope;
+
+    if (args.Length() > 1) {
+        ARG_CHECK_UINT32(0, offset);
+        ARG_CHECK_UINT32(1, rows);
+    } else {
+        ARG_CHECK_UINT32(0, rows);
+    }
+
+    node_drizzle::Query *query = node::ObjectWrap::Unwrap<node_drizzle::Query>(args.This());
+    assert(query);
+
+    query->sql << " LIMIT ";
+    if (args.Length() > 1) {
+        query->sql << args[0]->ToInt32()->Value();
+        query->sql << ",";
+        query->sql << args[1]->ToInt32()->Value();
+    } else {
+        query->sql << args[0]->ToInt32()->Value();
+    }
+
+    return args.This();
+}
+
+v8::Handle<v8::Value> node_drizzle::Query::Add(const v8::Arguments& args) {
+    v8::HandleScope scope;
+
+    ARG_CHECK_STRING(0, sql);
+
+    node_drizzle::Query *query = node::ObjectWrap::Unwrap<node_drizzle::Query>(args.This());
+    assert(query);
+
+    v8::String::Utf8Value sql(args[0]->ToString());
+    query->sql << " " << *sql;
 
     return args.This();
 }

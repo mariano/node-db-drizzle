@@ -49,6 +49,18 @@ do {                                                                      \
         THROW_EXCEPTION("Argument \"" #VAR "\" must be a valid boolean") \
     }
 
+#define ARG_CHECK_OPTIONAL_UINT32(I, VAR) \
+    if (args.Length() > I && !args[I]->IsUint32()) { \
+        THROW_EXCEPTION("Argument \"" #VAR "\" must be a valid UINT32") \
+    }
+
+#define ARG_CHECK_UINT32(I, VAR) \
+    if (args.Length() <= I) { \
+        THROW_EXCEPTION("Argument \"" #VAR "\" is mandatory") \
+    } else if (!args[I]->IsUint32()) { \
+        THROW_EXCEPTION("Argument \"" #VAR "\" must be a valid UINT32") \
+    }
+
 #define ARG_CHECK_OPTIONAL_OBJECT(I, VAR) \
     if (args.Length() > I && (!args[I]->IsObject() || args[I]->IsFunction() || args[I]->IsUndefined())) { \
         THROW_EXCEPTION("Argument \"" #VAR "\" must be a valid object") \

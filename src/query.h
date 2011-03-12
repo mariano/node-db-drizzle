@@ -53,6 +53,8 @@ class Query : public node::EventEmitter {
         static v8::Handle<v8::Value> From(const v8::Arguments& args);
         static v8::Handle<v8::Value> Join(const v8::Arguments& args);
         static v8::Handle<v8::Value> Where(const v8::Arguments& args);
+        static v8::Handle<v8::Value> Limit(const v8::Arguments& args);
+        static v8::Handle<v8::Value> Add(const v8::Arguments& args);
         static v8::Handle<v8::Value> Execute(const v8::Arguments& args);
         static int eioExecute(eio_req* eioRequest);
         static int eioExecuteFinished(eio_req* eioRequest);
