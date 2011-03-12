@@ -27,6 +27,8 @@ void node_drizzle::Drizzle::Init(v8::Handle<v8::Object> target) {
     NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "disconnect", Disconnect);
     NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "isConnected", IsConnected);
     NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "escape", Escape);
+    NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "table", Table);
+    NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "field", Field);
     NODE_ADD_PROTOTYPE_METHOD(functionTemplate, "query", Query);
 
     syReady = NODE_PERSISTENT_SYMBOL("ready");
@@ -242,6 +244,48 @@ v8::Handle<v8::Value> node_drizzle::Drizzle::Escape(const v8::Arguments& args) {
     }
 
     return scope.Close(v8::String::New(escaped.c_str()));
+}
+
+v8::Handle<v8::Value> node_drizzle::Drizzle::Table(const v8::Arguments& args) {
+    v8::HandleScope scope;
+
+    ARG_CHECK_STRING(0, table);
+
+    node_drizzle::Drizzle *drizzle = node::ObjectWrap::Unwrap<node_drizzle::Drizzle>(args.This());
+    assert(drizzle);
+
+    std::ostringstream escaped;
+
+    try {
+        v8::String::Utf8Value string(args[0]->ToString());
+        std::string unescaped(*string);
+        escaped << node_drizzle::Query::quoteTable << unescaped << node_drizzle::Query::quoteTable;
+    } catch(const drizzle::Exception& exception) {
+        THROW_EXCEPTION(exception.what())
+    }
+
+    return scope.Close(v8::String::New(escaped.str().c_str()));
+}
+
+v8::Handle<v8::Value> node_drizzle::Drizzle::Field(const v8::Arguments& args) {
+    v8::HandleScope scope;
+
+    ARG_CHECK_STRING(0, field);
+
+    node_drizzle::Drizzle *drizzle = node::ObjectWrap::Unwrap<node_drizzle::Drizzle>(args.This());
+    assert(drizzle);
+
+    std::ostringstream escaped;
+
+    try {
+        v8::String::Utf8Value string(args[0]->ToString());
+        std::string unescaped(*string);
+        escaped << node_drizzle::Query::quoteField << unescaped << node_drizzle::Query::quoteField;
+    } catch(const drizzle::Exception& exception) {
+        THROW_EXCEPTION(exception.what())
+    }
+
+    return scope.Close(v8::String::New(escaped.str().c_str()));
 }
 
 v8::Handle<v8::Value> node_drizzle::Drizzle::Query(const v8::Arguments& args) {

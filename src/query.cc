@@ -170,11 +170,11 @@ std::string node_drizzle::Query::selectField(v8::Local<v8::Value> value) const t
                 buffer << this->value(currentValue, false, currentValue->IsString() ? false : true);
             }
 
-            buffer << " AS " << Query::quoteField << *fieldName << Query::quoteField;
+            buffer << " AS " << node_drizzle::Query::quoteField << *fieldName << node_drizzle::Query::quoteField;
         }
     } else if (value->IsString()) {
         v8::String::Utf8Value fieldName(value->ToString());
-        buffer << Query::quoteField << *fieldName << Query::quoteField;
+        buffer << node_drizzle::Query::quoteField << *fieldName << node_drizzle::Query::quoteField;
     } else {
         throw drizzle::Exception("Incorrect value type provided as field for select");
     }
@@ -225,29 +225,29 @@ v8::Handle<v8::Value> node_drizzle::Query::From(const v8::Arguments& args) {
         v8::String::Utf8Value alias(propertyName);
 
         if (escape) {
-            query->sql << Query::quoteTable;
+            query->sql << node_drizzle::Query::quoteTable;
         }
         query->sql << *table;
         if (escape) {
-            query->sql << Query::quoteTable;
+            query->sql << node_drizzle::Query::quoteTable;
         }
         query->sql << " AS ";
         if (escape) {
-            query->sql << Query::quoteTable;
+            query->sql << node_drizzle::Query::quoteTable;
         }
         query->sql << *alias;
         if (escape) {
-            query->sql << Query::quoteTable;
+            query->sql << node_drizzle::Query::quoteTable;
         }
     } else {
         v8::String::Utf8Value tables(args[0]->ToString());
 
         if (escape) {
-            query->sql << Query::quoteTable;
+            query->sql << node_drizzle::Query::quoteTable;
         }
         query->sql << *tables;
         if (escape) {
-            query->sql << Query::quoteTable;
+            query->sql << node_drizzle::Query::quoteTable;
         }
     }
 
@@ -683,7 +683,7 @@ std::string node_drizzle::Query::parseQuery(const std::string& query, v8::Array*
             escaped = true;
         } else if (quote && currentChar == quote) {
             quote = 0;
-        } else if (!quote && (currentChar == Query::quoteString)) {
+        } else if (!quote && (currentChar == node_drizzle::Query::quoteString)) {
             quote = currentChar;
         } else if (!quote && currentChar == '?') {
             positions.push_back(i - delta);
@@ -728,7 +728,7 @@ std::string node_drizzle::Query::value(v8::Local<v8::Value> value, bool inArray,
             currentStream << ")";
         }
     } else if (value->IsDate()) {
-        currentStream << Query::quoteString << this->fromDate(v8::Date::Cast(*value)->NumberValue()) << Query::quoteString;
+        currentStream << node_drizzle::Query::quoteString << this->fromDate(v8::Date::Cast(*value)->NumberValue()) << node_drizzle::Query::quoteString;
     } else if (value->IsBoolean()) {
         currentStream << (value->IsTrue() ? "1" : "0");
     } else if (value->IsNumber()) {
@@ -737,7 +737,7 @@ std::string node_drizzle::Query::value(v8::Local<v8::Value> value, bool inArray,
         v8::String::Utf8Value currentString(value->ToString());
         std::string string = *currentString;
         if (escape) {
-            currentStream << Query::quoteString << this->connection->escape(string) << Query::quoteString;
+            currentStream << node_drizzle::Query::quoteString << this->connection->escape(string) << node_drizzle::Query::quoteString;
         } else {
             currentStream << string;
         }

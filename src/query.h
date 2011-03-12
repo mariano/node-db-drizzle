@@ -18,6 +18,9 @@ namespace node_drizzle {
 class Query : public node::EventEmitter {
     public:
         static v8::Persistent<v8::FunctionTemplate> constructorTemplate;
+        static const char quoteString;
+        static const char quoteField;
+        static const char quoteTable;
 
         static void Init(v8::Handle<v8::Object> target);
         void setConnection(drizzle::Connection* connection);
@@ -40,9 +43,6 @@ class Query : public node::EventEmitter {
         static v8::Persistent<v8::String> syError;
         static v8::Persistent<v8::String> sySuccess;
         static v8::Persistent<v8::String> syEach;
-        static const char quoteString;
-        static const char quoteField;
-        static const char quoteTable;
 
         Query();
         ~Query();

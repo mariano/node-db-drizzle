@@ -21,6 +21,15 @@ exports["Drizzle"] = testCase({
         test.equal("test \\'string\\' middle", drizzle.escape("test \'string\' middle"));
         
         test.done();
+    },
+    "table() and field()": function(test) {
+        var drizzle = this.drizzle;
+        test.expect(2);
+
+        test.equal("`field`", drizzle.field("field"));
+        test.equal("`table`", drizzle.field("table"));
+        
+        test.done();
     }
 });
 
@@ -160,7 +169,7 @@ exports["Query"] = testCase({
 
         test.done();
     },
-    "insert": function(test) {
+    "insert markers": function(test) {
         var drizzle = this.drizzle;
         test.expect(4);
 
