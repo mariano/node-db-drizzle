@@ -1,8 +1,8 @@
-# node-drizzle: Drizzle/MySQL bindings for Node.js #
+# node-db-drizzle: Drizzle/MySQL bindings for Node.js #
 
 ## LICENSE ##
 
-node-drizzle is released under the [MIT License] [license].
+node-db-drizzle is released under the [MIT License] [license].
 
 ## INSTALLATION ##
 
@@ -36,16 +36,16 @@ To download and build:
     $ make libdrizzle
     $ sudo make install-libdrizzle
 
-### Install node-drizzle ###
+### Install node-db-drizzle ###
 
 #### Using npm ####
 
-    $ npm install drizzle
+    $ npm install db-drizzle
 
 #### Using GIT ####
 
-    $ git clone https://github.com/mariano/node-drizzle.git
-    $ cd node-drizzle
+    $ git clone https://github.com/mariano/node-db-drizzle.git
+    $ cd node-db-drizzle
     $ node-waf configure build
 
 [license]: http://www.opensource.org/licenses/mit-license.php
