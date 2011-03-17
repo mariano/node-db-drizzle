@@ -39,7 +39,7 @@ def configure(conf):
 def build(bld):
   obj = bld.new_task_gen("cxx", "shlib", "node_addon")
   obj.target = "drizzle_bindings"
-  obj.source = "./src/drizzle/connection.cc src/drizzle/exception.cc src/drizzle/result.cc ./src/drizzle.cc ./src/drizzle_bindings.cc ./src/query.cc"
+  obj.source = "src/node-db/binding.cc src/node-db/connection.cc src/node-db/exception.cc src/node-db/query.cc src/connection.cc src/drizzle.cc src/query.cc src/result.cc src/drizzle_bindings.cc"
   obj.uselib = "DRIZZLE"
 
 def test(tst):
@@ -52,7 +52,7 @@ def test(tst):
 def lint(lnt):
   # Bindings C++ source code
   print("Run CPPLint:")
-  Utils.exec_command('cpplint --filter=-whitespace/line_length ./src/drizzle/*.h ./src/drizzle/*.cc ./src/*.h ./src/*.cc')
+  Utils.exec_command('cpplint --filter=-whitespace/line_length ./src/drizzle/*.h ./src/drizzle/*.cc ./src/node-db/*.h ./src/node-db/*.cc ./src/*.h ./src/*.cc')
   # Bindings javascript code, docs and tools
   print("Run Nodelint for sources:")
   Utils.exec_command('nodelint ./package.json ./drizzle.js')

@@ -1,10 +1,10 @@
 // Copyright 2011 Mariano Iglesias <mgiglesias@gmail.com>
-#ifndef SRC_DRIZZLE_EXCEPTION_H_
-#define SRC_DRIZZLE_EXCEPTION_H_
+#ifndef SRC_NODE_DB_EXCEPTION_H_
+#define SRC_NODE_DB_EXCEPTION_H_
 
 #include <exception>
 
-namespace drizzle {
+namespace node_db {
 class Exception : public std::exception {
     public:
         explicit Exception(const char* message);

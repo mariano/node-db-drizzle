@@ -1,7 +1,7 @@
 // Copyright 2011 Mariano Iglesias <mgiglesias@gmail.com>
 #include "./result.h"
 
-drizzle::Result::Column::Column(drizzle_column_st *column) {
+node_db_drizzle::Result::Column::Column(drizzle_column_st *column) {
     this->name = drizzle_column_name(column);
 
     switch (drizzle_column_type(column)) {
@@ -48,18 +48,18 @@ drizzle::Result::Column::Column(drizzle_column_st *column) {
     }
 }
 
-drizzle::Result::Column::~Column() {
+node_db_drizzle::Result::Column::~Column() {
 }
 
-std::string drizzle::Result::Column::getName() const {
+std::string node_db_drizzle::Result::Column::getName() const {
     return this->name;
 }
 
-drizzle::Result::Column::type_t drizzle::Result::Column::getType() const {
+node_db::Result::Column::type_t node_db_drizzle::Result::Column::getType() const {
     return this->type;
 }
 
-drizzle::Result::Result(drizzle_st* drizzle, drizzle_result_st* result) throw(drizzle::Exception&)
+node_db_drizzle::Result::Result(drizzle_st* drizzle, drizzle_result_st* result) throw(node_db::Exception&)
     : columns(NULL),
     totalColumns(0),
     rowNumber(0),
@@ -68,18 +68,18 @@ drizzle::Result::Result(drizzle_st* drizzle, drizzle_result_st* result) throw(dr
     previousRow(NULL),
     nextRow(NULL) {
     if (this->result == NULL) {
-        throw drizzle::Exception("Invalid result");
+        throw node_db::Exception("Invalid result");
     }
 
     if (drizzle_column_buffer(this->result) != DRIZZLE_RETURN_OK) {
-        throw drizzle::Exception("Could not buffer columns");
+        throw node_db::Exception("Could not buffer columns");
     }
 
     this->totalColumns = drizzle_result_column_count(this->result);
     if (this->totalColumns > 0) {
         this->columns = new Column*[this->totalColumns];
         if (this->columns == NULL) {
-            throw drizzle::Exception("Could not allocate storage for columns");
+            throw node_db::Exception("Could not allocate storage for columns");
         }
 
         uint16_t i = 0;
@@ -92,7 +92,7 @@ drizzle::Result::Result(drizzle_st* drizzle, drizzle_result_st* result) throw(dr
     this->nextRow = this->row();
 }
 
-drizzle::Result::~Result() {
+node_db_drizzle::Result::~Result() {
     if (this->columns != NULL) {
         for (uint16_t i = 0; i < this->totalColumns; i++) {
             delete this->columns[i];
@@ -109,11 +109,11 @@ drizzle::Result::~Result() {
     }
 }
 
-bool drizzle::Result::hasNext() const {
+bool node_db_drizzle::Result::hasNext() const {
     return (this->nextRow != NULL);
 }
 
-const char** drizzle::Result::next() throw(drizzle::Exception&) {
+const char** node_db_drizzle::Result::next() throw(node_db::Exception&) {
     if (this->previousRow != NULL) {
         drizzle_row_free(this->result, this->previousRow);
     }
@@ -129,7 +129,7 @@ const char** drizzle::Result::next() throw(drizzle::Exception&) {
     return (const char**) this->previousRow;
 }
 
-char** drizzle::Result::row() throw(drizzle::Exception&) {
+char** node_db_drizzle::Result::row() throw(node_db::Exception&) {
     drizzle_return_t result = DRIZZLE_RETURN_IO_WAIT;
     char **row = NULL;
 
@@ -137,11 +137,11 @@ char** drizzle::Result::row() throw(drizzle::Exception&) {
         row = drizzle_row_buffer(this->result, &result);
         if (result == DRIZZLE_RETURN_IO_WAIT) {
             if (drizzle_con_wait(this->drizzle) != DRIZZLE_RETURN_OK) {
-                throw drizzle::Exception("Could not wait for connection");
+                throw node_db::Exception("Could not wait for connection");
             }
 
             if (drizzle_con_ready(this->drizzle) == NULL) {
-                throw drizzle::Exception("Could not fetch connection");
+                throw node_db::Exception("Could not fetch connection");
             }
         }
     }
@@ -151,38 +151,38 @@ char** drizzle::Result::row() throw(drizzle::Exception&) {
             drizzle_row_free(this->result, row);
             row = NULL;
         }
-        throw drizzle::Exception("Could not prefetch next row");
+        throw node_db::Exception("Could not prefetch next row");
     }
 
     return row;
 }
 
-uint64_t drizzle::Result::index() const throw(std::out_of_range&) {
+uint64_t node_db_drizzle::Result::index() const throw(std::out_of_range&) {
     if (this->rowNumber == 0) {
         throw std::out_of_range("Not standing on a row");
     }
     return (this->rowNumber - 1);
 }
 
-drizzle::Result::Column* drizzle::Result::column(uint16_t i) const throw(std::out_of_range&) {
+node_db_drizzle::Result::Column* node_db_drizzle::Result::column(uint16_t i) const throw(std::out_of_range&) {
     if (i < 0 || i >= this->totalColumns) {
         throw std::out_of_range("Wrong column index");
     }
     return this->columns[i];
 }
 
-uint64_t drizzle::Result::insertId() const {
+uint64_t node_db_drizzle::Result::insertId() const {
     return drizzle_result_insert_id(this->result);
 }
 
-uint64_t drizzle::Result::affectedCount() const {
+uint64_t node_db_drizzle::Result::affectedCount() const {
     return drizzle_result_affected_rows(this->result);
 }
 
-uint16_t drizzle::Result::warningCount() const {
+uint16_t node_db_drizzle::Result::warningCount() const {
     return drizzle_result_warning_count(this->result);
 }
 
-uint16_t drizzle::Result::columnCount() const {
+uint16_t node_db_drizzle::Result::columnCount() const {
     return this->totalColumns;
 }
