@@ -1,6 +1,6 @@
 ####
 # Copyright by Mariano Iglesias
-# See contributors list in README
+# See contributors list in README.md
 #
 # See license text in LICENSE file
 ####
@@ -15,7 +15,7 @@ VERSION = "0.3.0"
 
 def set_options(opt):
   opt.tool_options("compiler_cxx")
-  opt.add_option('--debug', action='store_true', help='Run tests with node_g')
+  opt.add_option('--debug', action='store_true', help='Run tests with nodeunit_g')
   opt.add_option('--warn', action='store_true', help='Enable extra -W* compiler flags')
 
 def configure(conf):
@@ -39,7 +39,8 @@ def configure(conf):
 def build(bld):
   obj = bld.new_task_gen("cxx", "shlib", "node_addon")
   obj.target = "drizzle_bindings"
-  obj.source = "src/node-db/binding.cc src/node-db/connection.cc src/node-db/exception.cc src/node-db/query.cc src/node-db/result.cc src/connection.cc src/drizzle.cc src/query.cc src/result.cc src/drizzle_bindings.cc"
+  obj.source = "lib/node-db/binding.cc lib/node-db/connection.cc lib/node-db/exception.cc lib/node-db/query.cc lib/node-db/result.cc src/connection.cc src/drizzle.cc src/query.cc src/result.cc src/drizzle_bindings.cc"
+  obj.includes = "lib/"
   obj.uselib = "DRIZZLE"
 
 def test(tst):
@@ -52,57 +53,7 @@ def test(tst):
 def lint(lnt):
   # Bindings C++ source code
   print("Run CPPLint:")
-  Utils.exec_command('cpplint --filter=-whitespace/line_length ./src/node-db/*.h ./src/node-db/*.cc ./src/*.h ./src/*.cc')
-  # Bindings javascript code, docs and tools
+  Utils.exec_command('cpplint --filter=-whitespace/line_length ./lib/node-db/*.h ./lib/node-db/*.cc ./src/*.h ./src/*.cc')
+  # Bindings javascript code, and tools
   print("Run Nodelint for sources:")
   Utils.exec_command('nodelint ./package.json ./db-drizzle.js')
-
-def doc(doc):
-  description = ('--desc "Drizzle/MySQL bindings for [Node.js](http://nodejs.org) using libdrizzle.\n\n' +
-                 'Check out the [Github repo](http://github.com/mariano/node-db-drizzle) for the source and installation guide.\n\n' +
-                 'Extra information: ')
-  ribbon = '--ribbon "http://github.com/mariano/node-db-drizzle" '
-  
-  downloads = ('--desc-right "' +
-               'Latest version ' + VERSION + ':<br/>\n' +
-               '<a href="http://github.com/mariano/node-db-drizzle/zipball/v' + VERSION + '">\n' +
-               ' <img width="90" src="http://github.com/images/modules/download/zip.png" />\n' +
-               '</a>\n' +
-               '<a href="http://github.com/mariano/node-db-drizzle/tarball/v' + VERSION + '">\n' +
-               ' <img width="90" src="http://github.com/images/modules/download/tar.png" />\n' +
-               '</a>" ')
-  
-  print("Parse README.markdown:")
-  Utils.exec_command('dox --title "Node-db-drizzle" ' +
-                     description +
-                     '[ChangeLog](./changelog.html), [API](./api.html), [Examples](./examples.html), [Wiki](http://github.com/mariano/node-db-drizzle/wiki)." ' +
-                     ribbon +
-                     downloads +
-                     './README.markdown ' +
-                     '> ./doc/index.html')
-  print("Parse CHANGELOG.markdown:")
-  Utils.exec_command('dox --title "Node-db-drizzle changelog" ' +
-                     description +
-                     '[Homepage](./index.html), [API](./api.html), [Examples](./examples.html), [Wiki](http://github.com/mariano/node-db-drizzle/wiki)." ' +
-                     ribbon +
-                     './CHANGELOG.markdown ' +
-                     '> ./doc/changelog.html')
-  print("Parse API documentation:")
-  Utils.exec_command('dox --title "Node-db-drizzle API" ' +
-                     description +
-                     '[Homepage](./index.html), [ChangeLog](./changelog.html), [Examples](./examples.html), [Wiki](http://github.com/mariano/node-db-drizzle/wiki)." ' +
-                     ribbon +
-                     './src/connection.h ' +
-                     './src/connection.cc ' +
-                     './src/drizzle_bindings.cc ' +
-                     './src/drizzle.h ' +
-                     './src/drizzle.cc ' +
-                     './src/query.h' +
-                     './src/query.cc' +
-                     './src/result.h' +
-                     './src/result.cc' +
-                     './db-drizzle.js ' +
-                     '> ./doc/api.html')
-
-def gh_pages(context):
-  Utils.exec_command('./gh_pages.sh')
