@@ -4,6 +4,7 @@
 
 #include <libdrizzle/drizzle.h>
 #include <libdrizzle/drizzle_client.h>
+#include <string>
 #include "./node-db/connection.h"
 #include "./result.h"
 

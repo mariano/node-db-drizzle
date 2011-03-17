@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include <stdexcept>
+#include <string>
 #include "./exception.h"
 
 namespace node_db {
@@ -23,10 +24,12 @@ class Result {
                     SET
                 } type_t;
 
+                virtual ~Column();
                 virtual std::string getName() const = 0;
                 virtual type_t getType() const = 0;
         };
 
+        virtual ~Result();
         virtual bool hasNext() const = 0;
         virtual const char** next() throw(Exception&) = 0;
         virtual uint64_t index() const throw(std::out_of_range&) = 0;

@@ -1,11 +1,10 @@
 // Copyright 2011 Mariano Iglesias <mgiglesias@gmail.com>
 #include "./connection.h"
 
-node_db_drizzle::Connection::Connection() :
-    mysql(true),
+node_db_drizzle::Connection::Connection()
+    :mysql(true),
     drizzle(NULL),
-    connection(NULL)
-{
+    connection(NULL) {
     this->quoteString = '\'';
     this->quoteField = '`';
     this->quoteTable = '`';

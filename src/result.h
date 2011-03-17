@@ -50,4 +50,4 @@ class Result : public node_db::Result {
 };
 }
 
-#endif  // SRC_DRIZZLE_RESULT_H_
+#endif  // SRC_RESULT_H_

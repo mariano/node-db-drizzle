@@ -15,7 +15,7 @@ class Connection {
         char quoteTable;
 
         Connection();
-        ~Connection();
+        virtual ~Connection();
         virtual std::string getHostname() const;
         virtual void setHostname(const std::string& hostname);
         virtual std::string getUser() const;

@@ -1,6 +1,6 @@
 /* Escape & Query building tests */
 
-require("./drizzle");
+require("./db-drizzle");
 var testCase = require("nodeunit").testCase;
 
 exports["Drizzle"] = testCase({

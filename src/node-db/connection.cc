@@ -1,8 +1,8 @@
 // Copyright 2011 Mariano Iglesias <mgiglesias@gmail.com>
 #include "./connection.h"
 
-node_db::Connection::Connection() :
-    quoteString('\''),
+node_db::Connection::Connection()
+    :quoteString('\''),
     quoteField('`'),
     quoteTable('`'),
     port(3306),

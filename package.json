@@ -1,6 +1,6 @@
-{ "name" : "drizzle"
+{ "name" : "db-drizzle"
 , "description" : "Drizzle/MySQL bindings for Node.JS"
-, "homepage" : "http://github.com/mariano/node-drizzle"
+, "homepage" : "http://github.com/mariano/node-db-drizzle"
 , "version" : "0.3.0"
 , "engines" : { "node" : ">=0.4.1" }
 , "maintainers" :
@@ -8,14 +8,14 @@
     , "email": "mgiglesias@gmail.com"
     }
   ]
-, "bugs" : { "web" : "http://github.com/mariano/node-drizzle/issues" }
+, "bugs" : { "web" : "http://github.com/mariano/node-db-drizzle/issues" }
 , "licenses" : [ { "type" : "MIT" } ]
 , "repositories" :
   [ { "type" : "git"
-    , "url" : "http://github.com/mariano/node-drizzle.git"
+    , "url" : "http://github.com/mariano/node-db-drizzle.git"
     }
   ]
-, "main" : "./drizzle"
+, "main" : "./db-drizzle"
 , "scripts" :
   { "install" : "node-waf configure build"
   , "test" : "node-waf test"

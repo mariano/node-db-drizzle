@@ -14,4 +14,4 @@ class Exception : public std::exception {
 };
 }
 
-#endif  // SRC_DRIZZLE_EXCEPTION_H_
+#endif  // SRC_NODE_DB_EXCEPTION_H_

@@ -54,7 +54,7 @@ v8::Handle<v8::Value> node_db_drizzle::Drizzle::set(const v8::Arguments& args) {
     v8::Local<v8::Object> options = args[0]->ToObject();
     ARG_CHECK_OBJECT_ATTR_OPTIONAL_BOOL(options, mysql);
 
-    node_db_drizzle::Connection* connection = dynamic_cast<node_db_drizzle::Connection*>(this->connection);
+    node_db_drizzle::Connection* connection = static_cast<node_db_drizzle::Connection*>(this->connection);
 
     if (options->Has(mysql_key)) {
         connection->setMysql(options->Get(mysql_key)->IsTrue());
