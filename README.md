@@ -45,6 +45,7 @@ To download and build:
 #### Using GIT ####
 
     $ git clone https://github.com/mariano/node-db-drizzle.git
+    $ git submodule update --init
     $ cd node-db-drizzle
     $ node-waf configure build
 
