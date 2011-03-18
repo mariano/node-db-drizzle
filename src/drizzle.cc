@@ -66,6 +66,5 @@ v8::Handle<v8::Value> node_db_drizzle::Drizzle::set(const v8::Arguments& args) {
 v8::Persistent<v8::Object> node_db_drizzle::Drizzle::createQuery() const {
     v8::Persistent<v8::Object> query(
         node_db_drizzle::Query::constructorTemplate->GetFunction()->NewInstance());
-
     return query;
 }
