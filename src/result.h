@@ -28,6 +28,7 @@ class Result : public node_db::Result {
         ~Result();
         bool hasNext() const;
         const char** next() throw(node_db::Exception&);
+        uint64_t* columnLengths() throw(node_db::Exception&);
         uint64_t index() const throw(std::out_of_range&);
         Column* column(uint16_t i) const throw(std::out_of_range&);
         uint64_t insertId() const;

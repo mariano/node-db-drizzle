@@ -129,6 +129,10 @@ const char** node_db_drizzle::Result::next() throw(node_db::Exception&) {
     return (const char**) this->previousRow;
 }
 
+uint64_t* node_db_drizzle::Result::columnLengths() throw(node_db::Exception&) {
+    return drizzle_row_field_sizes(this->result);
+}
+
 char** node_db_drizzle::Result::row() throw(node_db::Exception&) {
     drizzle_return_t result = DRIZZLE_RETURN_IO_WAIT;
     char **row = NULL;
