@@ -308,7 +308,7 @@ exports["Query"] = testCase({
 
         test.done();
     },
-    "select()": function(test) {
+    "from()": function(test) {
         var drizzle = this.drizzle;
         test.expect(6);
 
