@@ -1,7 +1,15 @@
 /* Escape & Query building tests */
 
 require("./db-drizzle");
-var testCase = require("nodeunit").testCase;
+
+var nodeunit;
+try {
+    nodeunit = require("nodeunit");
+} catch(err) {
+    require.paths.unshift("/usr/lib/node_modules");
+    nodeunit = require("nodeunit/lib/nodeunit");
+}
+var testCase = nodeunit.testCase;
 
 exports["Drizzle"] = testCase({
     "setUp": function(callback) {
@@ -390,7 +398,7 @@ exports["Query"] = testCase({
             return false;
         }});
 
-        mysql.query().where("1=1").where("2=2").execute({ start: function(query) {
+        drizzle.query().where("1=1").where("2=2").execute({ start: function(query) {
             test.equal(" WHERE 1=1 AND 2=2", query);
             return false;
         }});
