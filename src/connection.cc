@@ -5,9 +5,6 @@ node_db_drizzle::Connection::Connection()
     :mysql(true),
     drizzle(NULL),
     connection(NULL) {
-    this->quoteString = '\'';
-    this->quoteField = '`';
-    this->quoteTable = '`';
 }
 
 node_db_drizzle::Connection::~Connection() {
