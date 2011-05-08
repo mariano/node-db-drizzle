@@ -1,5 +1,5 @@
 { "name" : "db-drizzle"
-, "description" : "Drizzle/MySQL bindings for Node.JS"
+, "description" : "Drizzle for Node.JS"
 , "homepage" : "http://nodejsdb.org"
 , "version" : "0.4.0"
 , "engines" : { "node" : ">=0.4.1" }
