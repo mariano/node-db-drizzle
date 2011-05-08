@@ -1,4 +1,4 @@
-# db-drizze: Drizzle database bindings for Node.js #
+# db-drizzle: Drizzle database bindings for Node.js #
 
 For detailed information about this and other Node.js
 database bindings visit the [Node.js DB homepage] [homepage].
