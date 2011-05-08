@@ -1,7 +1,7 @@
 # db-drizze: Drizzle database bindings for Node.js #
 
 For detailed information about this and other Node.js
-database bindings visit the [Node DB homepage] [homepage].
+database bindings visit the [Node.js DB homepage] [homepage].
 
 ## INSTALL ##
 
