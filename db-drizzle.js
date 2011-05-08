@@ -10,4 +10,4 @@
  * @ignore
  */
 var binding = require("./build/default/drizzle_bindings");
-Drizzle = binding.Drizzle;
+exports.Database = binding.Drizzle;

@@ -9,9 +9,8 @@ database bindings visit the [Node.js DB homepage] [homepage].
 
 ## QUICK START ##
 
-    require('db-drizzle');
-
-    new Drizzle({
+    var drizzle = require('db-drizzle');
+    new drizzle.Database({
         hostname: 'localhost',
         user: 'root',
         password: 'password',
