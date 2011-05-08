@@ -1,52 +1,30 @@
-# node-db-drizzle: Drizzle/MySQL bindings for Node.js #
+# db-drizze: Drizzle database bindings for Node.js #
+
+For detail information about this and other Node.js
+database bindings visit the [Node DB homepage] [homepage].
+
+## INSTALL ##
+
+        $ npm install db-drizzle
+
+## QUICK START ##
+
+        require('db-drizzle');
+
+        new Drizzle({
+            hostname: 'localhost',
+            user: 'root',
+            password: 'password',
+            database: 'node'
+        }).on('ready', function() {
+            this.query().select('*').from('users').execute(function(rows) {
+                console.log(rows.length + ' ROWS');
+            });
+        }).connect();
 
 ## LICENSE ##
 
-node-db-drizzle is released under the [MIT License] [license].
+This module is released under the [MIT License] [license].
 
-## INSTALLATION ##
-
-### Install libdrizzle ###
-
-#### Install Bazaar ####
-
-In *Debian* based systems:
-
-    $ sudo aptitude install bzr
-
-In *Arch*:
-
-    $ sudo pacman -S bzr
-
-#### Download and build ####
-
-If you are on *Arch Linux* you know that the default python binary points to
-Python 3. Unfortunately, Drizzle's pre_hook.sh and pandora-plugin files need 
-python 2. So change the references to python:
-
-    $ sed -i 's/python/python2/g' config/pre_hook.sh
-    $ sed -i 's/python/python2/g' config/pandora-plugin
-
-To download and build:
-
-    $ bzr branch lp:drizzle
-    $ cd drizzle/
-    $ ./config/autorun.sh
-    $ ./configure --without-server --prefix=/usr
-    $ make libdrizzle
-    $ sudo make install-libdrizzle
-
-### Install node-db-drizzle ###
-
-#### Using npm ####
-
-    $ npm install db-drizzle
-
-#### Using GIT ####
-
-    $ git clone https://github.com/mariano/node-db-drizzle.git
-    $ git submodule update --init
-    $ cd node-db-drizzle
-    $ node-waf configure build
-
+[homepage]: http://nodejsdb.org
 [license]: http://www.opensource.org/licenses/mit-license.php
