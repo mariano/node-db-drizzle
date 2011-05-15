@@ -129,7 +129,7 @@ const char** node_db_drizzle::Result::next() throw(node_db::Exception&) {
     return (const char**) this->previousRow;
 }
 
-uint64_t* node_db_drizzle::Result::columnLengths() throw(node_db::Exception&) {
+unsigned long* node_db_drizzle::Result::columnLengths() throw(node_db::Exception&) {
     return drizzle_row_field_sizes(this->result);
 }
 
