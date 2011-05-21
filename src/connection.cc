@@ -30,8 +30,6 @@ void node_db_drizzle::Connection::open() throw(node_db::Exception&) {
         if (this->drizzle == NULL) {
             throw node_db::Exception("Cannot create drizzle structure");
         }
-
-        drizzle_add_options(this->drizzle, DRIZZLE_NON_BLOCKING);
     }
 
     this->connection = drizzle_con_create(this->drizzle, NULL);
@@ -46,32 +44,14 @@ void node_db_drizzle::Connection::open() throw(node_db::Exception&) {
         drizzle_con_add_options(this->connection, DRIZZLE_CON_MYSQL);
     }
 
-    drizzle_return_t result;
-    try {
-        while (!this->opened) {
-            result = drizzle_con_connect(this->connection);
-            if (result == DRIZZLE_RETURN_OK) {
-                this->opened = true;
-                break;
-            } else if (result != DRIZZLE_RETURN_IO_WAIT) {
-                throw node_db::Exception(drizzle_con_error(this->connection));
-            }
+    if (drizzle_con_connect(this->connection) == DRIZZLE_RETURN_OK) {
+        this->opened = true;
+    } else {
+        drizzle_con_free(this->connection);
+        this->opened = false;
+        this->connection = NULL;
 
-            if (drizzle_con_wait(this->drizzle) != DRIZZLE_RETURN_OK) {
-                throw node_db::Exception("Could not wait for connection");
-            }
-
-            if (drizzle_con_ready(this->drizzle) == NULL) {
-                throw node_db::Exception("Could not fetch connection");
-            }
-        }
-    } catch(...) {
-        if (this->connection != NULL) {
-            drizzle_con_free(this->connection);
-            this->opened = false;
-            this->connection = NULL;
-        }
-        throw;
+        throw node_db::Exception("Could not connect");
     }
 }
 
@@ -113,25 +93,9 @@ node_db::Result* node_db_drizzle::Connection::query(const std::string& query) co
     drizzle_result_st *result = NULL;
     drizzle_return_t executed;
     try {
-        while (true) {
-            result = drizzle_query(this->connection, NULL, query.c_str(), query.length(), &executed);
-
-            if (executed == DRIZZLE_RETURN_OK) {
-                break;
-            } else if (executed != DRIZZLE_RETURN_IO_WAIT) {
-                if (executed == DRIZZLE_RETURN_LOST_CONNECTION) {
-                    throw node_db::Exception("Lost connection while executing query");
-                }
-                throw node_db::Exception(drizzle_con_error(this->connection));
-            }
-
-            if (drizzle_con_wait(this->drizzle) != DRIZZLE_RETURN_OK) {
-                throw node_db::Exception("Could not wait for connection");
-            }
-
-            if (drizzle_con_ready(this->drizzle) == NULL) {
-                throw node_db::Exception("Could not fetch connection");
-            }
+        result = drizzle_query(this->connection, NULL, query.c_str(), query.length(), &executed);
+        if (executed != DRIZZLE_RETURN_OK) {
+            throw node_db::Exception(drizzle_con_error(this->connection));
         }
     } catch(...) {
         if (result != NULL) {
