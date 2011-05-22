@@ -63,6 +63,7 @@ node_db_drizzle::Result::Result(drizzle_st* drizzle, drizzle_result_st* result) 
     : columns(NULL),
     totalColumns(0),
     rowNumber(0),
+    empty(true),
     drizzle(drizzle),
     result(result),
     previousRow(NULL),
@@ -77,6 +78,7 @@ node_db_drizzle::Result::Result(drizzle_st* drizzle, drizzle_result_st* result) 
 
     this->totalColumns = drizzle_result_column_count(this->result);
     if (this->totalColumns > 0) {
+        this->empty = false;
         this->columns = new Column*[this->totalColumns];
         if (this->columns == NULL) {
             throw node_db::Exception("Could not allocate storage for columns");
@@ -87,9 +89,9 @@ node_db_drizzle::Result::Result(drizzle_st* drizzle, drizzle_result_st* result) 
         while ((current = drizzle_column_next(this->result)) != NULL) {
             this->columns[i++] = new Column(current);
         }
-    }
 
-    this->nextRow = this->row();
+        this->nextRow = this->row();
+    }
 }
 
 node_db_drizzle::Result::~Result() {
@@ -185,4 +187,8 @@ uint64_t node_db_drizzle::Result::count() const throw(node_db::Exception&) {
 
 bool node_db_drizzle::Result::isBuffered() const throw() {
     return (this->result->options & DRIZZLE_RESULT_BUFFER_ROW);
+}
+
+bool node_db_drizzle::Result::isEmpty() const throw() {
+    return this->empty;
 }
