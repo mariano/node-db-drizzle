@@ -62,7 +62,6 @@ node_db::Result::Column::type_t node_db_drizzle::Result::Column::getType() const
 node_db_drizzle::Result::Result(drizzle_st* drizzle, drizzle_result_st* result) throw(node_db::Exception&)
     : columns(NULL),
     totalColumns(0),
-    totalRows(0),
     rowNumber(0),
     drizzle(drizzle),
     result(result),
@@ -72,11 +71,10 @@ node_db_drizzle::Result::Result(drizzle_st* drizzle, drizzle_result_st* result) 
         throw node_db::Exception("Invalid result");
     }
 
-    if (drizzle_result_buffer(this->result) != DRIZZLE_RETURN_OK) {
+    if (drizzle_column_buffer(this->result) != DRIZZLE_RETURN_OK) {
         throw node_db::Exception("Could not buffer columns");
     }
 
-    this->totalRows = drizzle_result_row_count(this->result);
     this->totalColumns = drizzle_result_column_count(this->result);
     if (this->totalColumns > 0) {
         this->columns = new Column*[this->totalColumns];
@@ -101,13 +99,25 @@ node_db_drizzle::Result::~Result() {
         }
         delete [] this->columns;
     }
+    if (this->result != NULL) {
+        if (this->previousRow != NULL) {
+            drizzle_row_free(this->result, this->previousRow);
+        }
+        if (this->nextRow != NULL) {
+            drizzle_row_free(this->result, this->nextRow);
+        }
+    }
 }
 
 bool node_db_drizzle::Result::hasNext() const {
     return (this->nextRow != NULL);
 }
 
-const char** node_db_drizzle::Result::next() throw(node_db::Exception&) {
+char** node_db_drizzle::Result::next() throw(node_db::Exception&) {
+    if (this->previousRow != NULL) {
+        drizzle_row_free(this->result, this->previousRow);
+    }
+
     if (this->nextRow == NULL) {
         return NULL;
     }
@@ -116,7 +126,7 @@ const char** node_db_drizzle::Result::next() throw(node_db::Exception&) {
     this->previousRow = this->nextRow;
     this->nextRow = this->row();
 
-    return (const char**) this->previousRow;
+    return this->previousRow;
 }
 
 unsigned long* node_db_drizzle::Result::columnLengths() throw(node_db::Exception&) {
@@ -124,7 +134,16 @@ unsigned long* node_db_drizzle::Result::columnLengths() throw(node_db::Exception
 }
 
 char** node_db_drizzle::Result::row() throw(node_db::Exception&) {
-    return drizzle_row_next(this->result);
+    drizzle_return_t result;
+    char** row = drizzle_row_buffer(this->result, &result);
+    if (result != DRIZZLE_RETURN_OK) {
+        if (row != NULL) {
+            drizzle_row_free(this->result, row);
+            row = NULL;
+        }
+        throw node_db::Exception("Could not prefetch next row");
+    }
+    return row;
 }
 
 uint64_t node_db_drizzle::Result::index() const throw(std::out_of_range&) {
@@ -157,6 +176,13 @@ uint16_t node_db_drizzle::Result::columnCount() const {
     return this->totalColumns;
 }
 
-uint64_t node_db_drizzle::Result::count() const throw() {
-    return this->totalRows;
+uint64_t node_db_drizzle::Result::count() const throw(node_db::Exception&) {
+    if (!this->isBuffered()) {
+        throw node_db::Exception("Result is not buffered");
+    }
+    return drizzle_result_row_count(this->result);
+}
+
+bool node_db_drizzle::Result::isBuffered() const throw() {
+    return (this->result->options & DRIZZLE_RESULT_BUFFER_ROW);
 }
