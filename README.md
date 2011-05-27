@@ -15,15 +15,18 @@ database bindings visit the [Node.js DB homepage] [homepage].
         user: 'root',
         password: 'password',
         database: 'node'
-    }).on('ready', function() {
+    }).connect(function(error) {
+        if (error) {
+            return console.log("CONNECTION ERROR: " + error);
+        }
+
         this.query().select('*').from('users').execute(function(error, rows) {
             if (error) {
-                console.log('ERROR: ' + error);
-                return;
+                return console.log('ERROR: ' + error);
             }
             console.log(rows.length + ' ROWS');
         });
-    }).connect();
+    });
 
 ## LICENSE ##
 
