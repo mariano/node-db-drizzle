@@ -1,5 +1,4 @@
 /build/*
-/drizzle-test.js
 *.node
 *.sh
 *.swp
