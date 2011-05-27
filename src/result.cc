@@ -156,7 +156,7 @@ uint64_t node_db_drizzle::Result::index() const throw(std::out_of_range&) {
 }
 
 node_db_drizzle::Result::Column* node_db_drizzle::Result::column(uint16_t i) const throw(std::out_of_range&) {
-    if (i < 0 || i >= this->totalColumns) {
+    if (i >= this->totalColumns) {
         throw std::out_of_range("Wrong column index");
     }
     return this->columns[i];
