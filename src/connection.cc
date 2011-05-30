@@ -22,6 +22,19 @@ void node_db_drizzle::Connection::setMysql(bool mysql) {
     this->mysql = mysql;
 }
 
+bool node_db_drizzle::Connection::isAlive(bool ping) throw() {
+    if (ping && this->alive) {
+        drizzle_return_t executed;
+        drizzle_result_st* result = drizzle_con_ping(this->connection, NULL, &executed);
+        if (result != NULL) {
+            drizzle_result_free(result);
+        }
+
+        this->alive = (executed == DRIZZLE_RETURN_OK);
+    }
+    return this->alive;
+}
+
 void node_db_drizzle::Connection::open() throw(node_db::Exception&) {
     this->close();
 
@@ -45,10 +58,10 @@ void node_db_drizzle::Connection::open() throw(node_db::Exception&) {
     }
 
     if (drizzle_con_connect(this->connection) == DRIZZLE_RETURN_OK) {
-        this->opened = true;
+        this->alive = true;
     } else {
         drizzle_con_free(this->connection);
-        this->opened = false;
+        this->alive = false;
         this->connection = NULL;
 
         throw node_db::Exception("Could not connect");
@@ -61,7 +74,7 @@ void node_db_drizzle::Connection::close() {
         drizzle_con_free(this->connection);
         this->connection = NULL;
     }
-    this->opened = false;
+    this->alive = false;
 }
 
 std::string node_db_drizzle::Connection::escape(const std::string& string) const throw(node_db::Exception&) {
@@ -78,18 +91,11 @@ std::string node_db_drizzle::Connection::escape(const std::string& string) const
 }
 
 std::string node_db_drizzle::Connection::version() const {
-    std::string version;
-    if (this->opened) {
-        version = drizzle_con_server_version(this->connection);
-    }
+    std::string version = drizzle_con_server_version(this->connection);
     return version;
 }
 
 node_db::Result* node_db_drizzle::Connection::query(const std::string& query) const throw(node_db::Exception&) {
-    if (!this->opened) {
-        throw node_db::Exception("Can't execute query without an opened connection");
-    }
-
     drizzle_result_st *result = NULL;
     drizzle_return_t executed;
     try {

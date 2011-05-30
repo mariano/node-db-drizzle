@@ -15,6 +15,7 @@ class Connection : public node_db::Connection {
         ~Connection();
         bool isMysql() const;
         void setMysql(bool mysql);
+        bool isAlive(bool ping=false) throw();
         void open() throw(node_db::Exception&);
         void close();
         std::string escape(const std::string& string) const throw(node_db::Exception&);
