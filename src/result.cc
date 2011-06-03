@@ -124,7 +124,7 @@ void node_db_drizzle::Result::free() throw() {
     }
 }
 
-bool node_db_drizzle::Result::hasNext() const {
+bool node_db_drizzle::Result::hasNext() const throw() {
     return (this->nextRow != NULL);
 }
 
@@ -175,19 +175,19 @@ node_db_drizzle::Result::Column* node_db_drizzle::Result::column(uint16_t i) con
     return this->columns[i];
 }
 
-uint64_t node_db_drizzle::Result::insertId() const {
+uint64_t node_db_drizzle::Result::insertId() const throw() {
     return drizzle_result_insert_id(this->result);
 }
 
-uint64_t node_db_drizzle::Result::affectedCount() const {
+uint64_t node_db_drizzle::Result::affectedCount() const throw() {
     return drizzle_result_affected_rows(this->result);
 }
 
-uint16_t node_db_drizzle::Result::warningCount() const {
+uint16_t node_db_drizzle::Result::warningCount() const throw() {
     return drizzle_result_warning_count(this->result);
 }
 
-uint16_t node_db_drizzle::Result::columnCount() const {
+uint16_t node_db_drizzle::Result::columnCount() const throw() {
     return this->totalColumns;
 }
 
