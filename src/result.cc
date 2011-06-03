@@ -88,6 +88,10 @@ node_db_drizzle::Result::Result(drizzle_st* drizzle, drizzle_result_st* result) 
         drizzle_column_st *current;
         while ((current = drizzle_column_next(this->result)) != NULL) {
             this->columns[i++] = new Column(current);
+            if (this->columns[i] == NULL) {
+                delete [] this->columns;
+                throw node_db::Exception("Could not allocate storage for column");
+            }
         }
 
         this->nextRow = this->row();
