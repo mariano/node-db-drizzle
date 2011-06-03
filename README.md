@@ -5,28 +5,32 @@ database bindings visit the [Node.js DB homepage] [homepage].
 
 ## INSTALL ##
 
-    $ npm install db-drizzle
+```bash
+$ npm install db-drizzle
+```
 
 ## QUICK START ##
 
-    var drizzle = require('db-drizzle');
-    new drizzle.Database({
-        hostname: 'localhost',
-        user: 'root',
-        password: 'password',
-        database: 'node'
-    }).connect(function(error) {
-        if (error) {
-            return console.log("CONNECTION ERROR: " + error);
-        }
+```javascript
+var drizzle = require('db-drizzle');
+new drizzle.Database({
+    hostname: 'localhost',
+    user: 'root',
+    password: 'password',
+    database: 'node'
+}).connect(function(error) {
+    if (error) {
+        return console.log("CONNECTION ERROR: " + error);
+    }
 
-        this.query().select('*').from('users').execute(function(error, rows) {
-            if (error) {
-                return console.log('ERROR: ' + error);
-            }
-            console.log(rows.length + ' ROWS');
-        });
+    this.query().select('*').from('users').execute(function(error, rows) {
+        if (error) {
+            return console.log('ERROR: ' + error);
+        }
+        console.log(rows.length + ' ROWS');
     });
+});
+```
 
 ## LICENSE ##
 
