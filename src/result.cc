@@ -108,8 +108,6 @@ node_db_drizzle::Result::~Result() {
 }
 
 void node_db_drizzle::Result::free() throw() {
-    this->release();
-
     if (this->columns != NULL) {
         for (uint16_t i = 0; i < this->totalColumns; i++) {
             delete this->columns[i];
@@ -124,9 +122,6 @@ void node_db_drizzle::Result::free() throw() {
             drizzle_row_free(this->result, this->nextRow);
         }
     }
-}
-
-void node_db_drizzle::Result::release() throw() {
 }
 
 bool node_db_drizzle::Result::hasNext() const throw() {
