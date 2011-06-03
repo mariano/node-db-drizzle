@@ -76,29 +76,38 @@ node_db_drizzle::Result::Result(drizzle_st* drizzle, drizzle_result_st* result) 
         throw node_db::Exception("Could not buffer columns");
     }
 
-    this->totalColumns = drizzle_result_column_count(this->result);
-    if (this->totalColumns > 0) {
-        this->empty = false;
-        this->columns = new Column*[this->totalColumns];
-        if (this->columns == NULL) {
-            throw node_db::Exception("Could not allocate storage for columns");
-        }
-
-        uint16_t i = 0;
-        drizzle_column_st *current;
-        while ((current = drizzle_column_next(this->result)) != NULL) {
-            this->columns[i++] = new Column(current);
-            if (this->columns[i] == NULL) {
-                delete [] this->columns;
-                throw node_db::Exception("Could not allocate storage for column");
+    try {
+        this->totalColumns = drizzle_result_column_count(this->result);
+        if (this->totalColumns > 0) {
+            this->empty = false;
+            this->columns = new Column*[this->totalColumns];
+            if (this->columns == NULL) {
+                throw node_db::Exception("Could not allocate storage for columns");
             }
-        }
 
-        this->nextRow = this->row();
+            uint16_t i = 0;
+            drizzle_column_st *current;
+            while ((current = drizzle_column_next(this->result)) != NULL) {
+                this->columns[i++] = new Column(current);
+                if (this->columns[i] == NULL) {
+                    this->totalColumns = i;
+                    throw node_db::Exception("Could not allocate storage for column");
+                }
+            }
+
+            this->nextRow = this->row();
+        }
+    } catch(...) {
+        this->free();
+        throw;
     }
 }
 
 node_db_drizzle::Result::~Result() {
+    this->free();
+}
+
+void node_db_drizzle::Result::free() throw() {
     if (this->columns != NULL) {
         for (uint16_t i = 0; i < this->totalColumns; i++) {
             delete this->columns[i];

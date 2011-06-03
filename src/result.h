@@ -46,6 +46,7 @@ class Result : public node_db::Result {
         bool empty;
 
         char** row() throw(node_db::Exception&);
+        void free() throw();
 
     private:
         drizzle_st *drizzle;
