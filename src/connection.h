@@ -2,8 +2,8 @@
 #ifndef SRC_CONNECTION_H_
 #define SRC_CONNECTION_H_
 
-#include <libdrizzle/drizzle.h>
-#include <libdrizzle/drizzle_client.h>
+#include <drizzle.h>
+#include <drizzle_client.h>
 #include <string>
 #include "./node-db/connection.h"
 #include "./result.h"

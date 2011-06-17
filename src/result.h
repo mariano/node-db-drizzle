@@ -2,8 +2,8 @@
 #ifndef SRC_RESULT_H_
 #define SRC_RESULT_H_
 
-#include <libdrizzle/drizzle.h>
-#include <libdrizzle/drizzle_client.h>
+#include <drizzle.h>
+#include <drizzle_client.h>
 #include <string>
 #include <stdexcept>
 #include "./node-db/exception.h"

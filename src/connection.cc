@@ -5,6 +5,7 @@ node_db_drizzle::Connection::Connection()
     :mysql(true),
     drizzle(NULL),
     connection(NULL) {
+    this->port = 3306;
 }
 
 node_db_drizzle::Connection::~Connection() {
@@ -60,11 +61,12 @@ void node_db_drizzle::Connection::open() throw(node_db::Exception&) {
     if (drizzle_con_connect(this->connection) == DRIZZLE_RETURN_OK) {
         this->alive = true;
     } else {
+        const char* error = drizzle_con_error(this->connection);
         drizzle_con_free(this->connection);
         this->alive = false;
         this->connection = NULL;
 
-        throw node_db::Exception("Could not connect");
+        throw node_db::Exception(error);
     }
 }
 

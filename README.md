@@ -5,6 +5,18 @@ database bindings visit the [Node.js DB homepage] [homepage].
 
 ## INSTALL ##
 
+Before proceeding with installation, you need to have the Drizzle
+libraries and include files. In order for the installation script to 
+locate them properly, you'll need to set the DRIZZLE_INCLUDE_DIR and 
+DRIZZLE_LIB_DIR environment variables. For example:
+
+```bash
+$ export DRIZZLE_INCLUDE_DIR=/usr/include/libdrizzle
+$ export DRIZZLE_LIB_DIR=/usr/lib
+```
+
+Once the environment variables are set, install with npm:
+
 ```bash
 $ npm install db-drizzle
 ```

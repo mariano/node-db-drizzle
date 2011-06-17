@@ -6,12 +6,12 @@
 ####
 
 import Options, Utils
-from os import unlink, symlink, chdir
+from os import unlink, symlink, chdir, environ
 from os.path import exists
 
 srcdir = "."
 blddir = "build"
-VERSION = "0.6.4"
+VERSION = "0.6.5"
 
 def set_options(opt):
   opt.tool_options("compiler_cxx")
@@ -29,11 +29,19 @@ def configure(conf):
     conf.env.append_unique('CXXFLAGS', ["-Wextra"])
     # Extra warnings, gcc 4.4
     conf.env.append_unique('CXXFLAGS', ["-Wconversion", "-Wshadow", "-Wsign-conversion", "-Wunreachable-code", "-Wredundant-decls", "-Wcast-qual"])
+
+  drizzle_include = environ.get("DRIZZLE_INCLUDE_DIR", "/usr/include/libdrizzle")
+  if drizzle_include:
+      conf.env.append_unique('CXXFLAGS', [ '-I' + drizzle_include ])
+
+  drizzle_lib = environ.get("DRIZZLE_LIB_DIR", "/usr/lib")
+  if drizzle_lib:
+      conf.env.append_unique('LINKFLAGS', [ '-L' + drizzle_lib ])
   
   if not conf.check_cxx(lib='drizzle'):
     conf.fatal("Missing libdrizzle from drizzle package")
  
-  if not conf.check_cxx(header_name='libdrizzle/drizzle.h'):
+  if not conf.check_cxx(header_name='drizzle.h'):
     conf.fatal("Missing drizzle.h header from drizzle package")
 
 def build(bld):
