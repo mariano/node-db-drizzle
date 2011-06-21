@@ -2,7 +2,7 @@
 , "description" : "Drizzle database bindings for Node.JS"
 , "keywords": ["database","db","native","binding","library","plugin","client","drizzle","libdrizzle"]
 , "homepage" : "http://nodejsdb.org/db-drizzle"
-, "version" : "0.6.5"
+, "version" : "0.6.6"
 , "engines" : { "node" : ">=0.4.1" }
 , "maintainers" :
   [ { "name": "Mariano Iglesias"

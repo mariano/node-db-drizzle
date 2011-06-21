@@ -145,7 +145,7 @@ char** node_db_drizzle::Result::next() throw(node_db::Exception&) {
 }
 
 unsigned long* node_db_drizzle::Result::columnLengths() throw(node_db::Exception&) {
-    return drizzle_row_field_sizes(this->result);
+    return (unsigned long*) drizzle_row_field_sizes(this->result);
 }
 
 char** node_db_drizzle::Result::row() throw(node_db::Exception&) {
