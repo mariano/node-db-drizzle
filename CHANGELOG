@@ -2,6 +2,10 @@ For more in depth changelog, check the Github Commits:
 
 https://github.com/mariano/node-db-drizzle/commits/master
 
+0.6.7
+-----
+* Adding support for both node 0.4.x and 0.5.x
+
 0.6.6
 -----
 * Fixing compilation warning on some OSs. Thanks @kwik101
