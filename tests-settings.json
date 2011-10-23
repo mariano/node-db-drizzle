@@ -1,5 +1,5 @@
 {
-    mysql: true, 
+    "mysql": true, 
     "host": "localhost",
     "user": "root",
     "password": "password",
